@@ -46,7 +46,7 @@ model User {
   trial_day_requests   Int                  @default(0) // Запросы за текущий день триала
   last_request_date    DateTime? // Дата последнего запроса (для сброса счётчика)
   promoCodeUsages      PromoCodeUsage[]
-  role UserRole @default(USER)
+  role                 UserRole             @default(USER)
 
   @@map("user")
 }
