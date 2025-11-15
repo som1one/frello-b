@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "dish" ALTER COLUMN "fats" DROP NOT NULL,
+ALTER COLUMN "carbs" DROP NOT NULL,
+ALTER COLUMN "cooking_time" DROP NOT NULL;

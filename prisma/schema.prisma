@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id                   String               @id @default(cuid())
+  created_at           DateTime             @default(now())
+  updated_at           DateTime             @updatedAt
+  email                String?              @unique
+  name                 String
+  password             String
+  gender               String?
+  age_range            AgeRange?
+  profileFilled        Boolean              @default(false)
+  weight               Float?
+  height               Float?
+  dietary_preferences  String?
+  dietary_restrictions String?
+  goal                 String?
+  mealPlans            MealPlan[]           @relation("UserMealPlan")
+  mealFrequency        MealFrequency?       @map("meal_frequency")
+  cooking_experience   CookingExperience?
+  dishes               Dish[]
+  tariff               Tariff[]
+  chats                Chat[]
+  messages             Message[]
+  settings             Json? // Новое поле для хранения пользовательских настроек
+  subscription         Subscription?
+  discount             Discount?
+  isActivated          Boolean              @default(false)
+  verificationTokens   VerificationToken[]
+  consumedMeals        ConsumedMeal[]       @relation
+  weightHistory        WeightHistory[]      @relation
+  passwordResetTokens  PasswordResetToken[] @relation("UserPasswordResetTokens")
+  trial_start_date     DateTime? // Дата начала триала (при регистрации)
+  trial_day_requests   Int                  @default(0) // Запросы за текущий день триала
+  last_request_date    DateTime? // Дата последнего запроса (для сброса счётчика)
+  promoCodeUsages      PromoCodeUsage[]
+  role UserRole @default(USER)
+
+  @@map("user")
+}
+
+model VerificationToken {
+  id        Int      @id @default(autoincrement())
+  token     String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model SubscriptionPlan {
+  id                 Int            @id @default(autoincrement())
+  name               String
+  duration           Int // Длительность в днях (30, 90, 180, 360)
+  price              Float // Цена (1000, 1800, 3500, 6500)
+  subscriptions      Subscription[]
+  discountPercentage Float?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model Subscription {
+  id        Int              @id @default(autoincrement())
+  userId    String           @unique
+  user      User             @relation(fields: [userId], references: [id])
+  planId    Int
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
+  startDate DateTime         @default(now())
+  endDate   DateTime
+  price     Float
+  status    String // "active", "expired", "canceled"
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model Discount {
+  id         Int       @id @default(autoincrement())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id])
+  percentage Float // Процент скидки (например, 10 для 10%)
+  validUntil DateTime? // Срок действия скидки (опционально)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model MealPlan {
+  id            Int            @id @default(autoincrement())
+  visible       Boolean        @default(false)
+  userId        String
+  user          User           @relation("UserMealPlan", fields: [userId], references: [id])
+  meals         Meal[]
+  consumedMeals ConsumedMeal[] @relation
+  planMessages  Message[]      @relation("MealPlanToMessage")
+  date          DateTime
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Meal {
+  id            Int            @id @default(autoincrement())
+  planId        Int
+  plan          MealPlan       @relation(fields: [planId], references: [id])
+  type          MealType
+  recipeName    String
+  calories      Int
+  portionSize   Int?           @map("portion_size")
+  dish          Dish?          @relation(fields: [dishId], references: [id])
+  dishId        Int?           @map("dish_id")
+  consumedMeals ConsumedMeal[] @relation
+}
+
+model Chat {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  title     String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+}
+
+model Message {
+  id             Int         @id @default(autoincrement())
+  isUser         Boolean
+  content        String
+  rawContent     String?
+  chatId         Int
+  chat           Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  dishId         Int?
+  dish           Dish?       @relation("DishToMessage", fields: [dishId], references: [id])
+  planId         Int? // связь с MealPlan
+  plan           MealPlan?   @relation("MealPlanToMessage", fields: [planId], references: [id])
+  aiResponseType RequestType @default(TEXT)
+  isLiked        Boolean     @default(false)
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime    @default(now())
+}
+
+model Dish {
+  id           Int       @id @default(autoincrement())
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  isFavorite   Boolean   @default(false)
+  name         String
+  image        String?
+  ingredients  String?
+  instruction  String?
+  proteins     Float?
+  fats         Float?
+  carbs        Float?
+  cooking_time Int?
+  calories     Float
+  user_id      String
+  user         User      @relation(fields: [user_id], references: [id])
+  messages     Message[] @relation("DishToMessage")
+  meals        Meal[]
+
+  @@unique([name, user_id])
+  @@map("dish")
+}
+
+model Tariff {
+  id              String   @id @default(cuid())
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+  expiration_date DateTime
+  is_active       Boolean  @default(false)
+  user_id         String
+  user            User     @relation(fields: [user_id], references: [id])
+
+  @@map("tariff")
+}
+
+model WeightHistory {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  weight    Float
+  date      DateTime
+  createdAt DateTime @default(now())
+}
+
+model ConsumedMeal {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  mealId    Int
+  meal      Meal     @relation(fields: [mealId], references: [id])
+  planId    Int // Добавляем поле planId
+  plan      MealPlan @relation(fields: [planId], references: [id]) // Связь с MealPlan
+  calories  Int
+  createdAt DateTime @default(now())
+}
+
+model PromoCode {
+  id          Int              @id @default(autoincrement())
+  code        String           @unique
+  percentage  Float?
+  validFrom   DateTime?
+  validUntil  DateTime?
+  isActive    Boolean          @default(true)
+  maxUses     Int?
+  currentUses Int              @default(0)
+  isUnlimited Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  usages      PromoCodeUsage[]
+
+  @@index([code])
+}
+
+model PromoCodeUsage {
+  id          Int       @id @default(autoincrement())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  promoCodeId Int
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id])
+  usedAt      DateTime  @default(now())
+
+  @@unique([userId, promoCodeId])
+  @@index([promoCodeId])
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique
+  token     String   @unique
+  expiresAt DateTime
+  user      User     @relation("UserPasswordResetTokens", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum AgeRange {
+  A3_17
+  A18_29
+  A30_39
+  A40_49
+  A50_Plus
+}
+
+enum MealFrequency {
+  ONE
+  TWO
+  THREE
+  FOUR
+  FIVE_OR_MORE
+}
+
+enum MealType {
+  breakfast
+  lunch
+  dinner
+  snack
+}
+
+enum CookingExperience {
+  BEGINNER
+  OCCASIONAL
+  REGULAR
+  EXPERIENCED
+  PROFESSIONAL
+}
+
+enum RequestType {
+  TEXT
+  MEAL_PLAN
+  REGENERATION_TEXT
+  REGENERATION_MEAL_PLAN
+  RECIPE
+}
