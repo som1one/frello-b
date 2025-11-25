@@ -16,7 +16,7 @@ import { PrismaService } from "src/prisma.service";
 @UseGuards(JwtAuthGuard, IsEmailConfirmedGuard)
 @Controller("consumed-meal")
 export class ConsumedMealController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   @Post()
   async addConsumedMeal(
@@ -93,6 +93,7 @@ export class ConsumedMealController {
         planId: true,
         calories: true,
         mealId: true,
+        createdAt: true,
         plan: {
           select: {
             date: true,
@@ -102,26 +103,29 @@ export class ConsumedMealController {
       orderBy: { createdAt: "desc" },
     });
 
-    const caloriesByPlan = consumedMeals.reduce(
+    const caloriesByDate = consumedMeals.reduce(
       (acc, meal) => {
-        const planIdStr = meal.planId.toString();
-        if (!acc[planIdStr]) {
-          acc[planIdStr] = { calories: 0, mealIds: [], date: meal.plan.date };
+        // Group by consumption date (YYYY-MM-DD)
+        const dateKey = meal.createdAt.toISOString().split('T')[0];
+
+        if (!acc[dateKey]) {
+          acc[dateKey] = {
+            calories: 0,
+            mealIds: [],
+            date: meal.createdAt,
+            // Keep planId for compatibility, though it's less relevant now. 
+            // We can use the meal's planId or a default.
+            planId: meal.planId
+          };
         }
-        acc[planIdStr].calories += meal.calories;
-        acc[planIdStr].mealIds.push(meal.mealId);
+        acc[dateKey].calories += meal.calories;
+        acc[dateKey].mealIds.push(meal.mealId);
         return acc;
       },
-      {} as Record<string, { calories: number; mealIds: number[]; date: Date }>,
+      {} as Record<string, { calories: number; mealIds: number[]; date: Date; planId: number }>,
     );
 
-    return Object.entries(caloriesByPlan)
-      .map(([planId, { calories, mealIds, date }]) => ({
-        planId: Number(planId),
-        calories,
-        mealIds,
-        date,
-      }))
+    return Object.values(caloriesByDate)
       .sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 }

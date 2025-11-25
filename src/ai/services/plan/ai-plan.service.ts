@@ -22,7 +22,7 @@ export class AiPlanService {
     private readonly aiHttpClientService: AiHttpClientService,
     private readonly aiParsePlanService: AiParsePlanService,
     private readonly chatService: ChatService,
-  ) {}
+  ) { }
 
   // Метод для получения случайной мотивирующей фразы с вероятностью 30%
   private getRandomMotivationalPhrase(): string | null {
@@ -49,6 +49,10 @@ export class AiPlanService {
     mealFrequency: number;
     userMessage: Message;
   }) {
+    // Парсим запрос пользователя на количество дней
+    const requestedDays = this.parseRequestedDays(content);
+    this.logger.log(`User requested ${requestedDays} day(s)`);
+
     const preparedMessageForAI = await this.aiPrepareService.preparePlanMessage(
       {
         content,
@@ -72,10 +76,18 @@ export class AiPlanService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-    const plan = this.aiParsePlanService.formatPlanOutput(
+
+    let plan = this.aiParsePlanService.formatPlanOutput(
       output,
       mealFrequency,
     );
+
+    // КРИТИЧЕСКИ ВАЖНО: Обрезаем план до запрошенного количества дней
+    if (requestedDays !== null) {
+      plan = this.limitPlanToDays(plan, requestedDays);
+      this.logger.log(`Plan limited to ${requestedDays} day(s)`);
+    }
+
     this.logger.log("plan", plan);
 
     // Получаем мотивирующую фразу
@@ -97,5 +109,46 @@ export class AiPlanService {
     });
 
     return { userMessage, assistantMessage, type: RequestType.MEAL_PLAN };
+  }
+
+  // Парсит запрос пользователя и определяет количество дней
+  private parseRequestedDays(content: string): number | null {
+    const lowerContent = content.toLowerCase();
+
+    // Проверяем на "1 день", "один день", "план на день"
+    if (lowerContent.match(/\b(1|один)\s*(день|дня)\b/) ||
+      lowerContent.match(/\bплан\s+на\s+день\b/)) {
+      return 1;
+    }
+
+    // Проверяем на "неделю", "7 дней"
+    if (lowerContent.match(/\b(неделю|недели|7\s*дней)\b/)) {
+      return 7;
+    }
+
+    // Проверяем на конкретное число дней (например, "3 дня", "5 дней")
+    const match = lowerContent.match(/\b(\d+)\s*(день|дня|дней)\b/);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+
+    return null; // Если не удалось определить
+  }
+
+  // Обрезает план до указанного количества дней
+  private limitPlanToDays(plan: string, maxDays: number): string {
+    // Ищем все заголовки дней (например, "**День 1:**", "**День 2:**")
+    const dayPattern = /\*\*День\s+\d+:?\*\*/gi;
+    const matches = [...plan.matchAll(dayPattern)];
+
+    if (matches.length <= maxDays) {
+      return plan; // План уже содержит нужное количество дней или меньше
+    }
+
+    // Находим позицию, где начинается (maxDays + 1)-й день
+    const cutoffIndex = matches[maxDays].index;
+
+    // Обрезаем план
+    return plan.substring(0, cutoffIndex).trim();
   }
 }

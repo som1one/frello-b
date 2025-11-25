@@ -8,7 +8,7 @@ import { PlanDay, PlanMeal } from "src/plan/dto/create-plan.dto";
 @Injectable()
 export class AiParsePlanService {
   private readonly logger = new Logger(AiParsePlanService.name);
-  constructor() {}
+  constructor() { }
 
   parseTextToPlan(
     content: string,
@@ -166,15 +166,6 @@ export class AiParsePlanService {
 
   private constructPlanMessage(plan: PlanDay[], mealFrequency: number): string {
     const mealLabels = getMealLabels(mealFrequency);
-    const WEEK_LABEL = [
-      "Понедельник",
-      "Вторник",
-      "Среда",
-      "Четверг",
-      "Пятница",
-      "Суббота",
-      "Воскресенье",
-    ];
     this.logger.log("plan constructPlanMessage", plan);
     let prefix = "";
     if (plan[0]?.warning) {
@@ -183,12 +174,8 @@ export class AiParsePlanService {
     }
     const result = plan
       .map((day, i) => {
-        const dayLabel =
-          plan.length === 7
-            ? WEEK_LABEL[i]
-            : plan.length === 1
-              ? null
-              : `День ${i + 1}`;
+        // Всегда используем формат "День 1", "День 2" и т.д.
+        const dayLabel = plan.length === 1 ? null : `День ${i + 1}`;
         const meals = day.meals.map(
           (meal) =>
             `${mealLabels[meal.type] || "Приём пищи"}: ${meal.recipeName} (${meal.calories} ккал, ${meal.portionSize} г)`,

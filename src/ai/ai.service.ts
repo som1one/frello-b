@@ -22,7 +22,7 @@ export class AiService {
     private readonly aiChatService: AiChatService,
     private readonly aiParsePlanService: AiParsePlanService,
     private readonly aiPlanGeneratorService: AiPlanGeneratorService,
-  ) {}
+  ) { }
 
   async fetchAssistantResponse(
     chatId: number,
@@ -67,7 +67,6 @@ export class AiService {
     chatId: number;
     messageId: number;
   }) {
-    await this.aiUserService.validateRequestLimit(userId);
     const message = await this.aiChatService.getMessageById(messageId);
     this.logger.log("message to like", message);
     if (message.isLiked) {
@@ -101,6 +100,11 @@ export class AiService {
           messageId,
           requestType: message.aiResponseType,
         });
+
+      // Mark dish as favorite
+      if (dishId) {
+        await this.aiPlanGeneratorService.markDishAsFavorite(dishId);
+      }
 
       await this.aiChatService.updateMessage({
         chatId,

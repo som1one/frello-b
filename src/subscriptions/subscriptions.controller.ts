@@ -7,7 +7,7 @@ import { IsEmailConfirmedGuard } from '@/auth/guards/is-email-confirm.guard'
 @UseGuards(JwtAuthGuard, IsEmailConfirmedGuard)
 @Controller('subscriptions')
 export class SubscriptionsController {
-	constructor(private readonly subscriptionsService: SubscriptionsService) {}
+	constructor(private readonly subscriptionsService: SubscriptionsService) { }
 
 	@Get('plans')
 	getPlans() {
@@ -40,5 +40,24 @@ export class SubscriptionsController {
 			body.percentage,
 			body.validUntil ? new Date(body.validUntil) : undefined
 		)
+	}
+
+	@UseGuards(JwtAuthGuard)
+	@Post('admin/grant')
+	grantSubscriptionByEmail(
+		@Body() body: { email: string; titleSlug: string }
+	) {
+		return this.subscriptionsService.grantSubscriptionByEmail(
+			body.email,
+			body.titleSlug
+		)
+	}
+
+	@UseGuards(JwtAuthGuard)
+	@Post('admin/revoke')
+	revokeSubscriptionByEmail(
+		@Body() body: { email: string }
+	) {
+		return this.subscriptionsService.revokeSubscriptionByEmail(body.email)
 	}
 }

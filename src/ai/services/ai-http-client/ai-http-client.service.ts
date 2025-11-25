@@ -17,10 +17,12 @@ export class AiHttpClientService {
   constructor(private readonly httpService: HttpService) {}
   async fetchApiResponse(
     messages: { role: MessageRole; content: string }[],
-    options: { temperature?: number } = {},
+    options: { temperature?: number; maxTokens?: number } = {},
   ) {
-    const { model, maxTokens, apiKey, baseUrl } = this.apiConfig;
+    const { model, apiKey, baseUrl } = this.apiConfig;
     const temperature = options.temperature ?? this.apiConfig.temperature;
+    // Используем переданный maxTokens или дефолтный, но для обычных сообщений можно уменьшить
+    const maxTokens = options.maxTokens ?? this.apiConfig.maxTokens;
 
     if (!apiKey) {
       throw new HttpException(
@@ -40,7 +42,10 @@ export class AiHttpClientService {
             max_tokens: maxTokens,
             is_sync: true,
           },
-          { headers: { Authorization: `Bearer ${apiKey}` } },
+          { 
+            headers: { Authorization: `Bearer ${apiKey}` },
+            timeout: 90000, // 90 секунд таймаут для безопасности
+          },
         ),
       );
 

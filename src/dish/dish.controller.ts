@@ -29,7 +29,7 @@ export class DishController {
   constructor(
     private prisma: PrismaService,
     private readonly dishService: DishService,
-  ) {}
+  ) { }
 
   @UsePipes(ValidationPipe)
   @Post("create")
@@ -80,7 +80,7 @@ export class DishController {
 
     return await this.prisma.dish.update({
       where: { id: dishId },
-      data: { isFavorite: true },
+      data: { isFavorite: !dish.isFavorite },
     });
   }
 

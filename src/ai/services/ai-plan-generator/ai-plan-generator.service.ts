@@ -11,7 +11,7 @@ export class AiPlanGeneratorService {
   constructor(
     private readonly dishService: DishService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   async saveDishAndPlan({
     dishDetails,
@@ -55,6 +55,14 @@ export class AiPlanGeneratorService {
     messageId: number,
   ): Promise<number | null> {
     try {
+      // Hide old visible plans before creating new ones
+      this.logger.log(`Hiding old plans for user ${userId}`);
+      const updateResult = await this.prisma.mealPlan.updateMany({
+        where: { userId, visible: true },
+        data: { visible: false }
+      });
+      this.logger.log(`Hidden ${updateResult.count} old plans`);
+
       const date: Date = new Date();
       date.setUTCHours(0, 0, 0, 0);
       if (planDetails.length > 1) {
@@ -68,8 +76,10 @@ export class AiPlanGeneratorService {
         const savedMeals = await Promise.all(
           day.meals.slice(0, mealFrequency).map(async (meal) => {
             const dish = await this.dishService.createDish(meal, userId);
+            // Normalize meal type: snack1, snack2, etc. -> snack
+            const normalizedType = meal.type.replace(/\d+$/, '') as MealType;
             return {
-              type: meal.type as MealType,
+              type: normalizedType,
               dishId: dish.id,
               recipeName: meal.recipeName,
               calories: meal.calories,
@@ -125,11 +135,11 @@ export class AiPlanGeneratorService {
     }
   }
 
-  private isValidDish(dishDetails: PlanMeal): boolean {
-    return !!(
-      dishDetails.recipeName &&
-      dishDetails.calories &&
-      dishDetails.type
-    );
+  private isValidDish(dish: Partial<PlanMeal>): boolean {
+    return this.dishService.isValidDish(dish);
+  }
+
+  async markDishAsFavorite(dishId: number): Promise<void> {
+    await this.dishService.markAsFavorite(dishId);
   }
 }

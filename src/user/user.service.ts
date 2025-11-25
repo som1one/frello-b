@@ -25,7 +25,7 @@ enum MealFrequency {
 @Injectable()
 export class UserService {
 	private readonly logger = new Logger(UserService.name)
-	constructor(private prisma: PrismaService) {}
+	constructor(private prisma: PrismaService) { }
 
 	// Получение пользователя по ID
 	getById(id: string) {
@@ -89,7 +89,7 @@ export class UserService {
 			where: {
 				id,
 			},
-			data: { ...data, mealFrequency: MealFrequency.THREE },
+			data: { ...data, mealFrequency: MealFrequency.FOUR },
 			select: {
 				email: true,
 				name: true,
@@ -126,7 +126,7 @@ export class UserService {
 		return {
 			mealFrequency: (settings as any).mealFrequency
 				? Number((settings as any).mealFrequency)
-				: 3,
+				: 4,
 			...(typeof settings === 'object' ? settings : {}),
 		}
 	}
@@ -301,6 +301,133 @@ export class UserService {
 			where: { id: promo.id },
 			data: { isActive: false },
 		})
+	}
+
+	async getPromoAnalytics(code: string) {
+		// Получаем промокод с использованиями
+		const promo = await this.prisma.promoCode.findUnique({
+			where: { code: code.toUpperCase() },
+			include: {
+				usages: {
+					include: {
+						user: {
+							include: {
+								subscription: {
+									where: { status: 'active' },
+									include: { plan: true },
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		if (!promo) throw new NotFoundException('Промокод не найден')
+
+		// Структура для хранения данных по месяцам
+		interface MonthlyData {
+			month1: number  // Количество подписок на 1 месяц
+			month6: number  // Количество подписок на 6 месяцев
+			month12: number // Количество подписок на 12 месяцев
+			revenue: number // Общий доход за месяц (20%)
+		}
+		const monthlyStats: { [key: string]: MonthlyData } = {}
+
+		// Обрабатываем каждое использование промокода
+		for (const usage of promo.usages) {
+			const subscription = usage.user.subscription
+
+			if (!subscription || subscription.status !== 'active') continue
+
+			const subscriptionPrice = subscription.price
+			const monthlyCommission = (subscriptionPrice * 0.2) / 12 // 20% от подписки, разделенный на 12 месяцев
+
+			// Определяем тип подписки по длительности
+			const planDuration = subscription.plan.duration // в днях
+			let subscriptionType: 'month1' | 'month6' | 'month12' = 'month1'
+
+			if (planDuration >= 350) {
+				subscriptionType = 'month12' // 12 месяцев
+			} else if (planDuration >= 170) {
+				subscriptionType = 'month6'  // 6 месяцев
+			} else {
+				subscriptionType = 'month1'  // 1 месяц
+			}
+
+			// Определяем сколько месяцев активна подписка
+			const startDate = new Date(subscription.startDate)
+			const endDate = new Date(subscription.endDate)
+
+			// Генерируем записи для каждого месяца подписки
+			const current = new Date(startDate)
+			while (current < endDate) {
+				const periodStart = new Date(current)
+				const periodEnd = new Date(current)
+				periodEnd.setMonth(periodEnd.getMonth() + 1)
+
+				// Формат: DD.MM.YY-DD.MM.YY
+				const key = `${this.formatDate(periodStart)}-${this.formatDate(periodEnd)}`
+
+				if (!monthlyStats[key]) {
+					monthlyStats[key] = {
+						month1: 0,
+						month6: 0,
+						month12: 0,
+						revenue: 0,
+					}
+				}
+
+				// Увеличиваем счетчик соответствующего типа подписки только в первый месяц
+				if (current.getTime() === startDate.getTime()) {
+					monthlyStats[key][subscriptionType] += 1
+				}
+
+				monthlyStats[key].revenue += monthlyCommission
+
+				current.setMonth(current.getMonth() + 1)
+			}
+		}
+
+		// Конвертируем в массив и сортируем по датам
+		const periods = Object.entries(monthlyStats)
+			.map(([period, stats]) => ({
+				period,
+				month1Count: stats.month1,
+				month6Count: stats.month6,
+				month12Count: stats.month12,
+				revenue: Math.round(stats.revenue),
+			}))
+			.sort((a, b) => {
+				const dateA = new Date(a.period.split('-')[0].split('.').reverse().join('-'))
+				const dateB = new Date(b.period.split('-')[0].split('.').reverse().join('-'))
+				return dateA.getTime() - dateB.getTime()
+			})
+
+		// Считаем общий доход
+		const totalRevenue = periods.reduce((sum, p) => sum + p.revenue, 0)
+		const totalMonth1 = periods.reduce((sum, p) => sum + p.month1Count, 0)
+		const totalMonth6 = periods.reduce((sum, p) => sum + p.month6Count, 0)
+		const totalMonth12 = periods.reduce((sum, p) => sum + p.month12Count, 0)
+
+		return {
+			code: promo.code,
+			totalUsages: promo.currentUses,
+			totalRevenue,
+			totalSubscriptions: {
+				month1: totalMonth1,
+				month6: totalMonth6,
+				month12: totalMonth12,
+			},
+			periods,
+		}
+	}
+
+	private formatDate(date: Date): string {
+		const day = date.getDate().toString().padStart(2, '0')
+		const month = (date.getMonth() + 1).toString().padStart(2, '0')
+		const year = date.getFullYear().toString().slice(-2)
+		return `${day}.${month}.${year}`
 	}
 
 	private async resetDailyRequestsIfNeeded(user: {

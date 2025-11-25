@@ -34,7 +34,7 @@ export class AiPrepareService {
   constructor(
     private readonly userService: UserService,
     private readonly aiDishService: AiDishService,
-  ) {}
+  ) { }
 
   private getRandomMotivationalPhrase(): string | null {
     const shouldAddMotivation = Math.random() < 0.3;
@@ -49,7 +49,7 @@ export class AiPrepareService {
     userId,
     content,
     messages,
-    maxContextMessages = 5,
+    maxContextMessages,
     skipContext = false,
   }: {
     userId: string;
@@ -69,16 +69,19 @@ export class AiPrepareService {
 			Отвечай в текстовом формате, без JSON, кратко
 			и по делу, учитывая настройки пользователя.${motivationInstruction}`;
 
+    // Ограничиваем контекст до последних 25 сообщений по умолчанию для ускорения работы
+    // Это достаточно для понимания контекста, но не перегружает запрос
+    const defaultContextLimit = 25;
     const filteredMessages = skipContext
       ? []
       : messages
-          .filter(
-            (msg) =>
-              msg.content &&
-              msg.content.trim() !== "" &&
-              !(msg.isUser && msg.content === content),
-          )
-          .slice(-maxContextMessages);
+        .filter(
+          (msg) =>
+            msg.content &&
+            msg.content.trim() !== "" &&
+            !(msg.isUser && msg.content === content),
+        )
+        .slice(maxContextMessages ? -maxContextMessages : -defaultContextLimit);
 
     const systemMessage = `${baseMessage}${settingsBlock}${textInstruction}`;
     return [
@@ -121,7 +124,7 @@ export class AiPrepareService {
       .slice(-3)
       .map((msg) => stripHtml(msg.content))
       .join("\n\n")
-      .slice(0, 1000); // Ограничение длины
+      .slice(0, 5000); // Ограничение длины увеличина до 5000 для лучшего контекста
 
     const avoidInstruction = previousPlans
       ? `\nИЗБЕГАЙ повторения предыдущих планов. Запрещенные рецепты и структуры: ${previousPlans}. Генерируй полностью новые блюда.`
@@ -138,10 +141,10 @@ export class AiPrepareService {
       role: msg.isUser ? MessageRole.USER : MessageRole.ASSISTANT,
       content: msg.dishId
         ? JSON.stringify(
-            this.aiDishService.parseDishFromText(msg.content, msg.dishId) ?? {
-              content: stripHtml(msg.content),
-            },
-          )
+          this.aiDishService.parseDishFromText(msg.content, msg.dishId) ?? {
+            content: stripHtml(msg.content),
+          },
+        )
         : stripHtml(msg.content),
     }));
 
@@ -184,9 +187,11 @@ export class AiPrepareService {
       (msg) => msg.content && msg.content.trim() !== "",
     );
 
-    const uniqueMessages = filteredMessages.filter(
-      (msg) => !(msg.isUser && msg.content === content),
-    );
+    const uniqueMessages = filteredMessages
+      .filter(
+        (msg) => !(msg.isUser && msg.content === content),
+      )
+      .slice(-15); // Ограничиваем до последних 15 сообщений для планов питания
 
     return [
       { role: MessageRole.SYSTEM, content: systemMessage },
@@ -194,15 +199,15 @@ export class AiPrepareService {
         role: msg.isUser ? MessageRole.USER : MessageRole.ASSISTANT,
         content: msg.dishId
           ? JSON.stringify(
-              this.aiDishService.parseDishFromText(msg.content, msg.dishId) ?? {
-                content: stripHtml(msg.content),
-              },
-            )
+            this.aiDishService.parseDishFromText(msg.content, msg.dishId) ?? {
+              content: stripHtml(msg.content),
+            },
+          )
           : stripHtml(msg.content),
       })),
       {
         role: MessageRole.USER,
-        content: `${content}. Составьте план питания с РОВНО ${mealFrequency} приёмами пищи: ${Object.values(mealLabels).join(", ")}. Пропуск или добавление лишних приёмов СТРОГО ЗАПРЕЩЕНО.`,
+        content: `${content}. КРИТИЧЕСКИ ВАЖНО: План должен содержать РОВНО ${mealFrequency} приёмов пищи в каждом дне: ${Object.values(mealLabels).join(", ")}. Пропуск или добавление лишних приёмов СТРОГО ЗАПРЕЩЕНО. В ответе используйте формат "День 1", "День 2" и т.д. для обозначения дней.`,
       },
     ];
   }
@@ -261,18 +266,52 @@ export class AiPrepareService {
     const userSettings = await this.getUserSettings(userId);
     const settingsStr = userSettings
       ? Object.entries(userSettings)
-          .filter(([key]) => key !== "email" && key !== "password")
-          .map(([key, value]) => {
-            if (value == null || (Array.isArray(value) && value.length === 0))
-              return null;
-            return `${key}: ${Array.isArray(value) ? value.join(", ") : value}`;
-          })
-          .filter(Boolean)
-          .join("; ")
+        .filter(([key]) => key !== "email" && key !== "password" && !key.endsWith("CustomInputs"))
+        .map(([key, value]) => {
+          if (value == null || (Array.isArray(value) && value.length === 0))
+            return null;
+
+          // Обрабатываем обычные поля
+          let fieldStr = `${key}: ${Array.isArray(value) ? value.join(", ") : value}`;
+
+          // Добавляем customInputs если они есть
+          const customInputsKey = `${key}CustomInputs` as keyof typeof userSettings;
+          const customInputs = userSettings[customInputsKey] as Record<string, string> | undefined;
+
+          if (customInputs && typeof customInputs === 'object' && Object.keys(customInputs).length > 0) {
+            const customInputsStr = Object.entries(customInputs)
+              .filter(([_, val]) => val && val.trim())
+              .map(([option, val]) => {
+                // Убираем "(указать)" и "(введите)" из названия опции
+                const cleanOption = option
+                  .replace(/\s*\(указать\)\s*/gi, '')
+                  .replace(/\s*\(введите\)\s*/gi, '');
+                return `${cleanOption}: ${val}`;
+              })
+              .join(", ");
+
+            if (customInputsStr) {
+              fieldStr += ` (уточнения: ${customInputsStr})`;
+            }
+          }
+
+          return fieldStr;
+        })
+        .filter(Boolean)
+        .join("; ")
       : "";
+
+    // Добавляем информацию о текущем дне недели
+    const now = new Date();
+    const daysOfWeek = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+    const currentDayOfWeek = daysOfWeek[now.getDay()];
+    const currentDate = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const dateInfo = `\nТекущая дата: ${currentDate}, день недели: ${currentDayOfWeek}`;
+
     const settingsBlock = settingsStr
-      ? `\nНастройки пользователя: ${settingsStr}`
-      : "";
+      ? `\nНастройки пользователя: ${settingsStr}${dateInfo}`
+      : dateInfo;
 
     return {
       baseMessage: BASE_SYSTEM_MESSAGE,
@@ -346,24 +385,13 @@ ${daysInstruction}
   }
 
   private getDaysLimitInstruction(): string {
-    return `\nПлан питания: максимум 14 дней. 
-Если пользователь запросил БОЛЬШЕ 14 дней:
-1. Генерируй ТОЛЬКО 14 дней плана
-2. Добавь поле "warning" в ПЕРВЫЙ объект плана:
-   "warning": "Максимум 14 дней. Вот план на 14 дней:"
-3. Верни JSON БЕЗ текста перед массивом
-
-ПРИМЕР (если >14 дней):
-[
-  {
-    "warning": "Максимум 14 дней. Вот план на 14 дней:",
-    "meals": [...]
-  },
-  {...}
-	// всего 14 объектов
-]
-
-Если ≤14 дней — БЕЗ "warning`;
+    return `\n!!! КРИТИЧЕСКИ ВАЖНО ПО КОЛИЧЕСТВУ ДНЕЙ !!!
+1. Если пользователь пишет "план на день", "один день", "1 день" -> ГЕНЕРИРУЙ РОВНО 1 ДЕНЬ.
+2. Если пользователь пишет "план на неделю", "неделя" -> ГЕНЕРИРУЙ РОВНО 7 ДНЕЙ.
+3. Игнорируй любые другие настройки длительности, если они противоречат запросу пользователя.
+4. НИКОГДА не генерируй 6 дней, если просят неделю.
+5. НИКОГДА не генерируй неделю, если просят 1 день.
+6. Строго следуй запрошенному количеству.`;
   }
 
   async getUserSettings(userId: string): Promise<Partial<UserSettingsType>> {

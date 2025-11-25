@@ -271,7 +271,6 @@ enum CookingExperience {
   OCCASIONAL
   REGULAR
   EXPERIENCED
-  PROFESSIONAL
 }
 
 enum RequestType {

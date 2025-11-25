@@ -25,7 +25,7 @@ export class AuthService {
 		private jwt: JwtService,
 		private userService: UserService,
 		private readonly emailService: EmailService
-	) {}
+	) { }
 
 	// Логин пользователя
 	async login(dto: AuthDto): Promise<{
@@ -209,9 +209,14 @@ export class AuthService {
 		if (!isValid)
 			throw new UnauthorizedException('Неверный пароль. Попробуйте снова')
 
+		if (!user.isActivated) {
+			throw new UnauthorizedException('Email не подтверждён')
+		}
+
 		const { password, ...userWithoutPassword } = user
 		return userWithoutPassword
 	}
+
 
 	async resendVerificationEmail(email: string) {
 		const user = await this.prisma.user.findUnique({ where: { email } })
@@ -292,7 +297,8 @@ export class AuthService {
 			create: { userId: user.id, token, expiresAt },
 		})
 
-		const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${token}`
+		const clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'https://frello.ru'
+		const resetLink = `${clientUrl}/reset-password?token=${token}`
 		await this.emailService.sendPasswordResetEmail(email, resetLink)
 	}
 
@@ -318,5 +324,24 @@ export class AuthService {
 		await this.prisma.passwordResetToken.delete({ where: { id: reset.id } })
 
 		return this.issueTokens(reset.userId)
+	}
+
+	async validatePromoCode(code: string): Promise<boolean> {
+		if (!code || code.trim() === '') return false
+
+		const promo = await this.prisma.promoCode.findUnique({
+			where: { code: code.toUpperCase() },
+		})
+
+		if (!promo || !promo.isActive) return false
+		if (promo.validUntil && promo.validUntil < new Date()) return false
+		if (
+			!promo.isUnlimited &&
+			promo.maxUses &&
+			promo.currentUses >= promo.maxUses
+		)
+			return false
+
+		return true
 	}
 }

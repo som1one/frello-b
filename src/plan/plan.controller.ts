@@ -23,7 +23,7 @@ export class PlanController {
   constructor(
     private planService: PlanService,
     private prismaService: PrismaService,
-  ) {}
+  ) { }
 
   @UseGuards(JwtAuthGuard, IsEmailConfirmedGuard)
   @Post("create")
@@ -80,17 +80,17 @@ export class PlanController {
         userId,
       },
       include: { meals: true },
-      orderBy: [{ id: "desc" }],
+      orderBy: [{ date: "asc" }],
       take: 14,
     });
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {}
+  findOne(@Param("id") id: string) { }
 
   @Patch(":id")
-  update(@Param("id") id: string) {}
+  update(@Param("id") id: string) { }
 
   @Delete(":id")
-  remove(@Param("id") id: string) {}
+  remove(@Param("id") id: string) { }
 }

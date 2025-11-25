@@ -4,7 +4,7 @@ import { PrismaService } from '@/prisma.service'
 
 @Injectable()
 export class SubscriptionsService {
-	constructor(private prisma: PrismaService) {}
+	constructor(private prisma: PrismaService) { }
 
 	async getPlans() {
 		return this.prisma.subscriptionPlan.findMany()
@@ -76,30 +76,92 @@ export class SubscriptionsService {
 		})
 	}
 
-	async seedPlans() {
-		return this.prisma.subscriptionPlan.createMany({
-			data: [
-				{ name: '1 month', duration: 30, price: 1000, discountPercentage: 50 },
-				{
-					name: '3 month',
-					duration: 90,
-					price: 1800,
-					discountPercentage: 22,
-				},
-				{
-					name: '6 month',
-					duration: 180,
-					price: 3500,
-					discountPercentage: 29,
-				},
-				{
-					name: '12 month',
-					duration: 360,
-					price: 6500,
-					discountPercentage: 31,
-				},
-			],
-			skipDuplicates: true, // Пропускает дубликаты, если записи уже есть
+	async grantSubscriptionByEmail(email: string, titleSlug: string) {
+		// Найти пользователя по email
+		const user = await this.prisma.user.findUnique({
+			where: { email },
 		})
+
+		if (!user) {
+			throw new HttpException('User not found', HttpStatus.NOT_FOUND)
+		}
+
+		// Выдать подписку
+		return this.createSubscription(user.id, titleSlug)
+	}
+
+	async revokeSubscriptionByEmail(email: string) {
+		// Найти пользователя по email
+		const user = await this.prisma.user.findUnique({
+			where: { email },
+		})
+
+		if (!user) {
+			throw new HttpException('User not found', HttpStatus.NOT_FOUND)
+		}
+
+		// Найти активную подписку
+		const subscription = await this.prisma.subscription.findFirst({
+			where: { userId: user.id, status: 'active' },
+		})
+
+		if (!subscription) {
+			throw new HttpException('No active subscription found', HttpStatus.NOT_FOUND)
+		}
+
+		// Удалить подписку
+		await this.prisma.subscription.delete({
+			where: { id: subscription.id },
+		})
+
+		return { message: 'Subscription revoked successfully', email }
+	}
+
+	async seedPlans() {
+		// Обновляем существующие планы или создаем новые
+		const plans = [
+			{ name: '1 month', duration: 30, price: 999, discountPercentage: 50 },
+			{
+				name: '3 month',
+				duration: 90,
+				price: 1800,
+				discountPercentage: 22,
+			},
+			{
+				name: '6 month',
+				duration: 180,
+				price: 3999,
+				discountPercentage: 29,
+			},
+			{
+				name: '12 month',
+				duration: 360,
+				price: 6999,
+				discountPercentage: 31,
+			},
+		]
+
+		// Обновляем каждый план
+		for (const plan of plans) {
+			const existingPlan = await this.prisma.subscriptionPlan.findFirst({
+				where: { name: plan.name },
+			})
+
+			if (existingPlan) {
+				await this.prisma.subscriptionPlan.update({
+					where: { id: existingPlan.id },
+					data: {
+						price: plan.price,
+						discountPercentage: plan.discountPercentage,
+					},
+				})
+			} else {
+				await this.prisma.subscriptionPlan.create({
+					data: plan,
+				})
+			}
+		}
+
+		return plans
 	}
 }

@@ -10,6 +10,7 @@ import { PrismaService } from './prisma.service'
 import { MiddlewareConsumer } from '@nestjs/common'
 import { LoggerMiddleware } from './middleware/logger.middleware'
 import { SubscriptionsModule } from '@/subscriptions/subscriptions.module'
+import { PaymentModule } from './payment/payment.module'
 import { MailerModule } from '@nestjs-modules/mailer'
 import { ScheduleModule } from '@nestjs/schedule'
 import { WeightHistoryModule } from './weight-history/weight-history.module'
@@ -49,6 +50,7 @@ import { AiModule } from './ai/ai.module'
 		DishModule,
 		PlanModule,
 		SubscriptionsModule,
+		PaymentModule,
 		WeightHistoryModule,
 		AiModule,
 	],

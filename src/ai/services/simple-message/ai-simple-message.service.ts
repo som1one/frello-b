@@ -35,7 +35,7 @@ export class AiSimpleMessageService {
 
 		const output = await this.aiHttpClientService.fetchApiResponse(
 			preparedMessageForAI,
-			{ temperature: 0.5 }
+			{ temperature: 0.5, maxTokens: 2048 } // Уменьшаем maxTokens для обычных сообщений для ускорения
 		)
 
 		if (!output?.trim()) {

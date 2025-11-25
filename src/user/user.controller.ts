@@ -32,7 +32,7 @@ export class UserController {
 	constructor(
 		private readonly userService: UserService,
 		private readonly authService: AuthService
-	) {}
+	) { }
 
 	// Получение профиля текущего пользователя
 	@UseGuards(JwtAuthGuard, IsEmailConfirmedGuard) // Secures these routes
@@ -174,6 +174,12 @@ export class UserController {
 	@UseGuards(JwtAuthGuard)
 	getStats(@Param('code') c: string) {
 		return this.userService.getPromoStats(c)
+	}
+
+	@Get('promo/analytics/:code')
+	@UseGuards(JwtAuthGuard)
+	getAnalytics(@Param('code') c: string) {
+		return this.userService.getPromoAnalytics(c)
 	}
 
 	@Get('promo/list')

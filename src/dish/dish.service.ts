@@ -18,7 +18,7 @@ export class DishService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => AiRecipeService))
     private readonly aiRecipeService: AiRecipeService,
-  ) {}
+  ) { }
 
   async findDishByName(name: string, userId: string) {
     return this.prisma.dish.findFirst({
@@ -177,5 +177,12 @@ export class DishService {
     return (
       typeof type === "string" && validMealTypes.includes(type as MealType)
     );
+  }
+
+  async markAsFavorite(dishId: number): Promise<void> {
+    await this.prisma.dish.update({
+      where: { id: dishId },
+      data: { isFavorite: true },
+    });
   }
 }

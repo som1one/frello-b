@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
+  Param,
   Post,
   Res,
   UnauthorizedException,
@@ -18,7 +20,7 @@ import {
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   // Маршрут для входа в систему
   @UsePipes(new ValidationPipe()) // Валидируем данные с помощью ValidationPipe
@@ -85,15 +87,15 @@ export class AuthController {
 
   @Post("verify-email")
   async verifyEmail(
-    @Body() body: { email: string; code: string },
-    @Res({ passthrough: true }) res: Response,
+    @Body() body: { email: string; code: string }
   ) {
     try {
       const tokens = await this.authService.verifyEmail(body.email, body.code);
-      this.setRefreshTokenCookie(res, tokens.refreshToken);
+
       return {
         accessToken: tokens.accessToken,
-        message: "Email успешно подтверждён",
+        refreshToken: tokens.refreshToken,
+        message: "Email успешно подтверждён"
       };
     } catch (error) {
       throw error;
@@ -123,6 +125,13 @@ export class AuthController {
   async resendVerification(@Body("email") email: string) {
     await this.authService.resendVerificationEmail(email);
     return { message: "Код подтверждения отправлен повторно" };
+  }
+
+  @Get("validate-promo/:code")
+  @HttpCode(200)
+  async validatePromoCode(@Param("code") code: string) {
+    const isValid = await this.authService.validatePromoCode(code);
+    return { valid: isValid };
   }
 
   private setRefreshTokenCookie(res: Response, refreshToken: string) {

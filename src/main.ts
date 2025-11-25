@@ -14,13 +14,22 @@ async function bootstrap() {
   app.setGlobalPrefix("api");
   app.use(cookieParser());
   app.enableCors({
-    origin: ["https://frello.ru/", "https://frello.ru/"],
+    origin: [
+      "http://31.207.74.107:3000",
+      "http://frello.ru",
+      "https://frello.ru",
+      "http://www.frello.ru",
+      "https://www.frello.ru",
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
-    exposedHeaders: "set-cookie",
+    exposedHeaders: ["set-cookie"],
   });
+  
 
   Logger.log("Application started", "Bootstrap");
 
-  await app.listen(4200);
+  await app.listen(3001);
 }
 bootstrap();
