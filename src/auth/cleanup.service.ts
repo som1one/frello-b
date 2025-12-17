@@ -30,8 +30,19 @@ export class CleanupService {
       const userIds = unverifiedUsers.map(user => user.id);
       this.logger.log(`Found ${userIds.length} unverified users: ${userIds.join(', ')}`);
 
-      // Удаляем связанные verification_tokens
+      // Удаляем связанные записи перед удалением пользователей
+      // 1. Verification tokens
       await this.prisma.verificationToken.deleteMany({
+        where: { userId: { in: userIds } },
+      });
+
+      // 2. PromoCodeUsage
+      await this.prisma.promoCodeUsage.deleteMany({
+        where: { userId: { in: userIds } },
+      });
+
+      // 3. Password reset tokens
+      await this.prisma.passwordResetToken.deleteMany({
         where: { userId: { in: userIds } },
       });
 
