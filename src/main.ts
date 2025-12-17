@@ -17,6 +17,8 @@ async function bootstrap() {
     origin: [
       "http://localhost:3000",  // Локальная разработка
       "http://31.207.74.107:3000",
+      "http://31.207.74.107",
+      "https://31.207.74.107",
       "http://frello.ru",
       "https://frello.ru",
       "http://www.frello.ru",
