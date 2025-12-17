@@ -85,11 +85,30 @@ export class UserService {
 			data = { ...dto, password: await hash(dto.password) }
 		}
 
+		// Map numeric mealFrequency to Enum
+		let mappedMealFrequency: MealFrequency | undefined;
+		if (dto.mealFrequency) {
+			switch (dto.mealFrequency) {
+				case 1: mappedMealFrequency = MealFrequency.ONE; break;
+				case 2: mappedMealFrequency = MealFrequency.TWO; break;
+				case 3: mappedMealFrequency = MealFrequency.THREE; break;
+				case 4: mappedMealFrequency = MealFrequency.FOUR; break;
+				case 5: mappedMealFrequency = MealFrequency.FIVE_OR_MORE; break;
+				case 6: mappedMealFrequency = MealFrequency.FIVE_OR_MORE; break;
+				default: mappedMealFrequency = MealFrequency.THREE; // Default fallback
+			}
+		}
+
+		const updateData: any = { ...data };
+		if (mappedMealFrequency) {
+			updateData.mealFrequency = mappedMealFrequency;
+		}
+
 		return this.prisma.user.update({
 			where: {
 				id,
 			},
-			data: { ...data, mealFrequency: MealFrequency.FOUR },
+			data: updateData,
 			select: {
 				email: true,
 				name: true,
@@ -123,10 +142,19 @@ export class UserService {
 		const settings =
 			user.settings && typeof user.settings === 'object' ? user.settings : {}
 		this.logger.log('Fetched settings', settings)
+
+		// Merge top-level fields with settings JSON
+		// Priority: settings JSON > top-level fields (or vice versa, depending on logic. Usually top-level is source of truth)
+		// Let's make top-level fields defaults if missing in settings JSON
 		return {
 			mealFrequency: (settings as any).mealFrequency
 				? Number((settings as any).mealFrequency)
 				: 4,
+			gender: user.gender || (settings as any).gender,
+			weight: user.weight || (settings as any).weight,
+			height: user.height || (settings as any).height,
+			nutritionGoal: user.goal ? [user.goal] : (settings as any).nutritionGoal,
+			ageRange: user.age_range || (settings as any).ageRange,
 			...(typeof settings === 'object' ? settings : {}),
 		}
 	}
@@ -301,6 +329,13 @@ export class UserService {
 			where: { id: promo.id },
 			data: { isActive: false },
 		})
+	}
+
+	async getAllUserEmails() {
+		const users = await this.prisma.user.findMany({
+			select: { email: true },
+		})
+		return users.map(u => u.email)
 	}
 
 	async getPromoAnalytics(code: string) {

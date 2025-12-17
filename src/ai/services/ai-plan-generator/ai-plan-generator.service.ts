@@ -74,7 +74,10 @@ export class AiPlanGeneratorService {
       const createdPlans = [];
       for (const day of planDetails) {
         const savedMeals = await Promise.all(
-          day.meals.slice(0, mealFrequency).map(async (meal) => {
+          day.meals
+            .slice(0, mealFrequency)
+            .filter((meal) => meal.recipeName && meal.recipeName.trim()) // Filter out invalid meals
+            .map(async (meal) => {
             const dish = await this.dishService.createDish(meal, userId);
             // Normalize meal type: snack1, snack2, etc. -> snack
             const normalizedType = meal.type.replace(/\d+$/, '') as MealType;
@@ -83,7 +86,7 @@ export class AiPlanGeneratorService {
               dishId: dish.id,
               recipeName: meal.recipeName,
               calories: meal.calories,
-              portionSize: meal.portionSize || 200,
+              portionSize: meal.portionSize || 0,
             };
           }),
         );

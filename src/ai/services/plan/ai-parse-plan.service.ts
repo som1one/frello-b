@@ -19,18 +19,38 @@ export class AiParsePlanService {
       .filter((line) => line.trim() && line.includes(": "));
     const mealTypeMap: { [key: string]: MealType } = {
       завтрак: "breakfast",
+      "второй завтрак": "snack",
       обед: "lunch",
+      полдник: "snack",
       ужин: "dinner",
       перекус: "snack",
     };
     const meals: PlanMeal[] = lines.map((line) => {
       const [type, rest] = line.split(": ");
-      const [recipeName, calories] = rest.split(" (");
+      // Extract recipe name, calories, and portion size
+      // Format: "Название блюда (300 ккал, 250 г)" or "Название блюда (300 ккал)"
+      const match = rest.match(/^(.+?)\s*\((\d+)\s*ккал(?:,\s*(\d+)\s*г)?\)/);
+
+      let recipeName = rest;
+      let calories = 0;
+      let portionSize = 0; // default fallback
+
+      if (match) {
+        recipeName = match[1].trim();
+        calories = parseInt(match[2]) || 0;
+        portionSize = match[3] ? parseInt(match[3]) : 0;
+      } else {
+        // Fallback to old parsing if new format doesn't match
+        const [name, cal] = rest.split(" (");
+        recipeName = name.trim();
+        calories = parseInt(cal?.replace(" ккал)", "")) || 0;
+      }
+
       return {
         type: mealTypeMap[type.toLowerCase()] || ("snack" as MealType),
-        recipeName: recipeName.trim(),
-        name: recipeName.trim(),
-        calories: parseInt(calories.replace(" ккал)", "")) || 0,
+        recipeName: recipeName,
+        name: recipeName,
+        calories: calories,
         proteins: 0,
         fats: 0,
         carbs: 0,
@@ -38,7 +58,7 @@ export class AiParsePlanService {
         instruction: "",
         cookingTime: 0,
         dishId: 0,
-        portionSize: 200,
+        portionSize: portionSize,
       };
     });
 
@@ -60,13 +80,18 @@ export class AiParsePlanService {
       const parsed = parseJsonOutput(output);
       this.logger.log("output parsed", parsed);
       this.logger.log("parsed in plan parse service", output);
+
+      if (parsed.error) {
+        return parsed.error;
+      }
+
       const plan = Array.isArray(parsed)
         ? parsed
         : parsed?.meals
           ? [parsed]
           : [];
       this.logger.log("plan in plan parse service", output);
-      return this.constructPlanMessage(plan, mealFrequency);
+      return this.constructPlanMessage(plan, mealFrequency, output);
     } catch {
       return stripHtml(output); // Если JSON невалидный, возвращаем очищенный текст
     }
@@ -79,6 +104,14 @@ export class AiParsePlanService {
     this.logger.log("Raw output received", output);
     if (isJsonOutput(output)) {
       const parsed = parseJsonOutput(output);
+
+      if (parsed.error) {
+        // Если вернулась ошибка, возвращаем пустой план, но ошибку можно было бы обработать иначе
+        // В данном контексте (parseAiOutput) мы возвращаем структуру dishDetails/planDetails
+        // Если ошибка, то плана нет.
+        return { dishDetails: {} as PlanMeal, planDetails: [] };
+      }
+
       const plan = Array.isArray(parsed)
         ? parsed
         : parsed?.meals
@@ -111,7 +144,7 @@ export class AiParsePlanService {
         instruction: rawParsed.instruction || "",
         cookingTime: rawParsed.cookingTime || 0,
         dishId: rawParsed.dishId || 0,
-        portionSize: rawParsed.portionSize || 200,
+        portionSize: rawParsed.portionSize || 0,
       };
       return { dishDetails, planDetails: [] };
     }
@@ -137,7 +170,7 @@ export class AiParsePlanService {
           instruction: meal.instruction || "",
           cookingTime: meal.cookingTime || 0,
           dishId: meal.dishId || 0,
-          portionSize: meal.portionSize || 200,
+          portionSize: meal.portionSize || 0,
         }));
       while (meals.length < mealFrequency) {
         const missingType =
@@ -146,7 +179,7 @@ export class AiParsePlanService {
           type: missingType as MealType,
           recipeName: `Дополнительный перекус ${meals.length - 2}`,
           name: `Дополнительный перекус ${meals.length - 2}`,
-          calories: 200,
+          calories: 0,
           proteins: 0,
           fats: 0,
           carbs: 0,
@@ -154,7 +187,7 @@ export class AiParsePlanService {
           instruction: "",
           cookingTime: 0,
           dishId: 0,
-          portionSize: 200,
+          portionSize: 0,
         });
       }
       return { meals };
@@ -164,9 +197,36 @@ export class AiParsePlanService {
     return { dishDetails, planDetails };
   }
 
-  private constructPlanMessage(plan: PlanDay[], mealFrequency: number): string {
+  private constructPlanMessage(plan: PlanDay[], mealFrequency: number, output?: string): string {
     const mealLabels = getMealLabels(mealFrequency);
     this.logger.log("plan constructPlanMessage", plan);
+    
+    // Извлекаем суточную норму калорий из вывода, если она есть
+    let calorieNorm = "";
+    if (output) {
+      const calorieMatch = output.match(/Ваша суточная норма калорий для достижения вашей цели:\s*(\d+)\s*ккал/i);
+      if (calorieMatch) {
+        calorieNorm = `Ваша суточная норма калорий для достижения вашей цели: ${calorieMatch[1]} ккал.\n`;
+      }
+    }
+    
+    // Извлекаем количество дней из вывода, если указано
+    let daysCount = "";
+    if (output) {
+      // Пробуем разные варианты: "План на 7 дней:", "План на 7 дн:", "на 7 дней"
+      const daysMatch = output.match(/План на\s*(\d+)\s*(?:дн|дня|дней|день)/i) || 
+                        output.match(/на\s*(\d+)\s*(?:дн|дня|дней|день)/i);
+      if (daysMatch) {
+        const daysNum = parseInt(daysMatch[1], 10);
+        const daysWord = daysNum === 1 ? 'день' : daysNum < 5 ? 'дня' : 'дней';
+        daysCount = `План на ${daysNum} ${daysWord}:\n`;
+      } else if (plan.length > 0) {
+        daysCount = `План на ${plan.length} ${plan.length === 1 ? 'день' : plan.length < 5 ? 'дня' : 'дней'}:\n`;
+      }
+    } else if (plan.length > 0) {
+      daysCount = `План на ${plan.length} ${plan.length === 1 ? 'день' : plan.length < 5 ? 'дня' : 'дней'}:\n`;
+    }
+    
     let prefix = "";
     if (plan[0]?.warning) {
       prefix = plan[0].warning + "\n\n";
@@ -183,6 +243,6 @@ export class AiParsePlanService {
         return dayLabel ? `${dayLabel}\n${meals.join("\n")}` : meals.join("\n");
       })
       .join("\n\n");
-    return prefix + result;
+    return prefix + calorieNorm + daysCount + result;
   }
 }

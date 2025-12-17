@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsEmail, IsEnum, IsOptional, IsString, MinLength, IsObject } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEmail, IsEnum, IsOptional, IsString, MinLength, IsObject, IsNumber } from 'class-validator';
 
 // Перечисления для возраста, частоты приема пищи и опыта в приготовлении пищи
 enum AgeRange {
@@ -70,9 +70,9 @@ export class UserDto {
   @IsOptional()
   cookingExperience?: CookingExperience;
 
-  @IsEnum(MealFrequency, { message: 'Укажите корректную частоту приема пищи' })
+  @IsNumber({}, { message: 'Частота приема пищи должна быть числом' })
   @IsOptional()
-  mealFrequency?: MealFrequency;
+  mealFrequency?: number;
 }
 
 export class UpdateSettingsDto {

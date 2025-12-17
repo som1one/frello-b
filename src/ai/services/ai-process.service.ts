@@ -16,7 +16,7 @@ export class AiProcessService {
 		private readonly aiPlanService: AiPlanService,
 		private readonly aiRegenerateService: AiRegenerateService,
 		private readonly aiRecipeService: AiRecipeService
-	) {}
+	) { }
 
 	private readonly apiConfig = {
 		apiKey: process.env.GENAPI_API_KEY || '',
@@ -53,6 +53,24 @@ export class AiProcessService {
 
 		switch (requestType) {
 			case RequestType.TEXT:
+				// Проверка на запрос плана на 1 день, который мог прийти как TEXT
+				const lowerContent = content.toLowerCase()
+				if (
+					lowerContent.includes('1 день') ||
+					lowerContent.includes('один день') ||
+					lowerContent.includes('план на день')
+				) {
+					this.logger.log('Redirecting TEXT request to MEAL_PLAN for 1-day plan')
+					return this.aiPlanService.createPlan({
+						chatId,
+						content,
+						messages,
+						userId,
+						mealFrequency,
+						userMessage
+					})
+				}
+
 				return this.aiSimpleMessageService.simpleMessage({
 					chatId,
 					content,

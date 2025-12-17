@@ -15,15 +15,23 @@ export const getMealLabels = (
 		4: {
 			breakfast: 'Завтрак',
 			lunch: 'Обед',
+			snack: 'Полдник',
 			dinner: 'Ужин',
-			snack: 'Перекус',
 		},
 		5: {
 			breakfast: 'Завтрак',
+			snack1: 'Второй завтрак',
 			lunch: 'Обед',
+			snack2: 'Полдник',
 			dinner: 'Ужин',
-			snack: 'Перекус',
-			snack2: 'Перекус',
+		},
+		6: {
+			breakfast: 'Завтрак',
+			snack1: 'Второй завтрак',
+			lunch: 'Обед',
+			snack2: 'Полдник',
+			dinner: 'Ужин',
+			snack3: 'Перекус',
 		},
 	}
 	if (labels[mealFrequency]) {

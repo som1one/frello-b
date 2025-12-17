@@ -49,6 +49,39 @@ export class AiPlanService {
     mealFrequency: number;
     userMessage: Message;
   }) {
+    // Get user settings to validate BMI
+    const userSettings = await this.aiPrepareService.getUserSettings(userId);
+
+    // Calculate BMI if we have weight and height
+    if (userSettings.weight && userSettings.height) {
+      const heightInMeters = userSettings.height / 100;
+      const bmi = userSettings.weight / (heightInMeters * heightInMeters);
+
+      this.logger.log(`BMI Calculation: weight=${userSettings.weight}kg, height=${userSettings.height}cm, heightInMeters=${heightInMeters}m, BMI=${bmi.toFixed(2)}`);
+
+      // Check if BMI < 18.5 AND goal is weight loss
+      const isWeightLossGoal = Array.isArray(userSettings.nutritionGoal)
+        ? userSettings.nutritionGoal.some(goal => goal.toLowerCase().includes('похудение'))
+        : userSettings.nutritionGoal?.toLowerCase().includes('похудение');
+
+      if (bmi < 18.5 && isWeightLossGoal) {
+        const bmiWarning = `❌ ВНИМАНИЕ: Ваш ИМТ составляет ${bmi.toFixed(1)}, что значительно ниже нормы (18.5-24.9). Снижение веса при таких показателях приведет к истощению организма, потере мышечной массы и нарушению работы жизненно важных систем. Пожалуйста, измените цель, например, на поддержание веса.`;
+
+        this.logger.log(`BMI validation failed: BMI=${bmi.toFixed(1)}, goal=weight loss. Returning warning.`);
+
+        const assistantMessage = await this.chatService.addMessage({
+          chatId,
+          userId,
+          content: bmiWarning,
+          rawContent: bmiWarning,
+          isUser: false,
+          aiResponseType: RequestType.TEXT,
+        });
+
+        return { userMessage, assistantMessage, type: RequestType.TEXT };
+      }
+    }
+
     // Парсим запрос пользователя на количество дней
     const requestedDays = this.parseRequestedDays(content);
     this.logger.log(`User requested ${requestedDays} day(s)`);
@@ -66,7 +99,7 @@ export class AiPlanService {
 
     const output = await this.aiHttpClientService.fetchApiResponse(
       preparedMessageForAI,
-      { temperature: 0.5 },
+      { temperature: 0.5, maxTokens: 8192 },
     );
     this.logger.log("output", output);
 

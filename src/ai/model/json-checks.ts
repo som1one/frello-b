@@ -1,6 +1,7 @@
 export function isJsonOutput(output: string): boolean {
   const trimmed = output.trim();
-  return /^\s*[\{\[]/.test(trimmed) || /\[\s*{[\s\S]*\}\s*\]/.test(trimmed);
+  // Check for standard JSON start OR markdown code block start
+  return /^\s*[\{\[]/.test(trimmed) || /^\s*```/.test(trimmed) || /\[\s*{[\s\S]*\}\s*\]/.test(trimmed);
 }
 
 export function parseJsonOutput(output: string): any {

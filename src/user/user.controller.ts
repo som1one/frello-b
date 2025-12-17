@@ -202,4 +202,10 @@ export class UserController {
 	deactivate(@Param('code') code: string) {
 		return this.userService.deactivatePromo(code)
 	}
+
+	@Get('admin/users/emails')
+	@UseGuards(JwtAuthGuard, RoleGuard)
+	async getAllUserEmails() {
+		return this.userService.getAllUserEmails()
+	}
 }

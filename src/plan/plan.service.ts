@@ -6,7 +6,7 @@ import { CreatePlanDto } from "./dto/create-plan.dto";
 @Injectable()
 export class PlanService {
   private readonly logger = new Logger(PlanService.name);
-  constructor(private prismaService: PrismaService) {}
+  constructor(private prismaService: PrismaService) { }
 
   async create(dto: CreatePlanDto, userId: string) {
     this.logger.log(
@@ -107,7 +107,7 @@ export class PlanService {
                 dishId: meal.dishId,
                 recipeName: meal.recipeName,
                 calories: meal.calories,
-                portionSize: meal.portionSize || 200,
+                portionSize: meal.portionSize || 0,
               })),
             },
           },

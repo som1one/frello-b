@@ -13,14 +13,14 @@ export function getRequestType({
   console.log("Lowercase content:", content.toLowerCase());
   if (isRegeneration) {
     // Проверяем, был ли исходный запрос планом питания
-    if (
-      originalMessage &&
-      planKeywords.some((keyword) =>
-        originalMessage.content.toLowerCase().includes(keyword),
-      )
-    ) {
-      return RequestType.REGENERATION_MEAL_PLAN;
-    }
+    // if (
+    //   originalMessage &&
+    //   planKeywords.some((keyword) =>
+    //     originalMessage.content.toLowerCase().includes(keyword),
+    //   )
+    // ) {
+    //   return RequestType.REGENERATION_MEAL_PLAN;
+    // }
   }
   if (planKeywords.some((keyword) => content.toLowerCase().includes(keyword))) {
     return RequestType.MEAL_PLAN;
@@ -66,4 +66,17 @@ const planKeywords = [
   "питание на неделю",
   "питание на день",
   "питание на",
+  "другой план",
+  "новый план",
+  "еще один план",
+  "составь план",
+  "сделай план",
+  "придумай план",
+  "меню на",
+  "меню на неделю",
+  "меню на день",
+  "давай другой",
+  "хочу другой",
+  "сделай другой",
+  "другой",
 ];

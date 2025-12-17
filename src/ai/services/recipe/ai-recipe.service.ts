@@ -24,7 +24,7 @@ export class AiRecipeService {
     @Inject(forwardRef(() => DishService))
     private readonly dishService: DishService,
     private readonly chatService: ChatService,
-  ) {}
+  ) { }
 
   async createRecipe({
     dto,
@@ -101,7 +101,18 @@ export class AiRecipeService {
       `Parsed result: ${result}, dishDetails: ${JSON.stringify(dishDetails)}`,
     );
 
-    const savedRecipe = await this.dishService.createDish(dishDetails, userId);
+    let savedRecipe: any = null;
+    let responseType: RequestType = RequestType.TEXT;
+
+    this.logger.log(`[DEBUG] Check name: ${JSON.stringify(dishDetails)}`);
+
+    if (dishDetails && dishDetails.name) {
+      this.logger.log(`[DEBUG] Name found: ${dishDetails.name}. Creating dish...`);
+      savedRecipe = await this.dishService.createDish(dishDetails, userId);
+      responseType = RequestType.RECIPE;
+    } else {
+      this.logger.log(`[DEBUG] No valid name found in dishDetails. Skipping dish creation.`);
+    }
 
     const assistantMessage = await this.chatService.addMessage({
       chatId,
@@ -109,16 +120,16 @@ export class AiRecipeService {
       content: result,
       rawContent: output,
       isUser: false,
-      dishId: savedRecipe.id,
+      dishId: savedRecipe?.id,
       planId: null,
-      aiResponseType: RequestType.RECIPE,
+      aiResponseType: responseType,
     });
 
     return {
       userMessage,
       assistantMessage,
       recipe: savedRecipe,
-      type: RequestType.RECIPE,
+      type: responseType,
     };
   }
 }

@@ -15,6 +15,7 @@ async function bootstrap() {
   app.use(cookieParser());
   app.enableCors({
     origin: [
+      "http://localhost:3000",  // Локальная разработка
       "http://31.207.74.107:3000",
       "http://frello.ru",
       "https://frello.ru",
