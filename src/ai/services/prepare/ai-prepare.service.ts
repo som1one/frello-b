@@ -531,7 +531,16 @@ export class AiPrepareService {
         activityStr = String(activityRaw || '');
       }
 
-      const goal = userSettings.nutritionGoal || '';
+      // Handle nutritionGoal - it might be array or object
+      let goal = '';
+      const goalRaw = userSettings.nutritionGoal || '';
+      if (Array.isArray(goalRaw)) {
+        goal = goalRaw[0] || '';
+      } else if (typeof goalRaw === 'object' && goalRaw !== null) {
+        goal = goalRaw.toString();
+      } else {
+        goal = String(goalRaw || '');
+      }
 
       // Calculate Age
       let age = 30; // Default fallback
