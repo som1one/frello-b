@@ -111,6 +111,7 @@ export class AiParseRecipeService {
         carbs: (normalized?.totals.carbs ?? parsed.carbs) || 0,
         type: "breakfast" as MealType,
         dishId: 0,
+        
         portionSize: (normalized?.totals.portionSize ?? parsed.portionSize) || 200,
       };
       return {
