@@ -105,13 +105,13 @@ export class AiParseRecipeService {
         ingredients: normalized?.ingredientsText ?? parsed.ingredients,
         instruction: parsed.instruction,
         cookingTime: parsed.cookingTime || 0,
-        calories: normalized?.totals.calories ?? parsed.calories || 0,
-        proteins: normalized?.totals.proteins ?? parsed.proteins || 0,
-        fats: normalized?.totals.fats ?? parsed.fats || 0,
-        carbs: normalized?.totals.carbs ?? parsed.carbs || 0,
+        calories: (normalized?.totals.calories ?? parsed.calories) || 0,
+        proteins: (normalized?.totals.proteins ?? parsed.proteins) || 0,
+        fats: (normalized?.totals.fats ?? parsed.fats) || 0,
+        carbs: (normalized?.totals.carbs ?? parsed.carbs) || 0,
         type: "breakfast" as MealType,
         dishId: 0,
-        portionSize: normalized?.totals.portionSize ?? parsed.portionSize || 200,
+        portionSize: (normalized?.totals.portionSize ?? parsed.portionSize) || 200,
       };
       return {
         result: dishDetails,
@@ -143,13 +143,13 @@ export class AiParseRecipeService {
         ingredients: normalized?.ingredientsText ?? parsed.ingredients,
         instruction: parsed.instruction,
         cookingTime: parsed.cookingTime || 0,
-        calories: normalized?.totals.calories ?? parsed.calories || 0,
-        proteins: normalized?.totals.proteins ?? parsed.proteins || 0,
-        fats: normalized?.totals.fats ?? parsed.fats || 0,
-        carbs: normalized?.totals.carbs ?? parsed.carbs || 0,
+        calories: (normalized?.totals.calories ?? parsed.calories) || 0,
+        proteins: (normalized?.totals.proteins ?? parsed.proteins) || 0,
+        fats: (normalized?.totals.fats ?? parsed.fats) || 0,
+        carbs: (normalized?.totals.carbs ?? parsed.carbs) || 0,
         type: "breakfast" as MealType,
         dishId: 0,
-        portionSize: normalized?.totals.portionSize ?? parsed.portionSize || 200,
+        portionSize: (normalized?.totals.portionSize ?? parsed.portionSize) || 200,
       };
       const result = constructDishMessage(dishDetails);
 
