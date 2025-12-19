@@ -71,9 +71,17 @@ export class AiParsePlanService {
   formatPlanOutput(output: string, mealFrequency: number): string {
     this.logger.log("output in plan parse service", output);
     if (!isJsonOutput(output)) {
-      this.logger.log("output !isJsonOutput(output)", output);
-      this.logger.log("output return stripHtml(output)", stripHtml(output));
-      return stripHtml(output); // Если не JSON, просто очищаем HTML
+      // Если не JSON, попробуем распарсить текстовую структуру плана и сформировать
+      // единый формат вывода, чтобы в интерфейсе всегда были строки вида:
+      // "Завтрак: Блюдо (XXX ккал, YYY г)"
+      const clean = stripHtml(output);
+      try {
+        const { planDetails } = this.parseTextToPlan(clean, mealFrequency);
+        return this.constructPlanMessage(planDetails, mealFrequency, clean);
+      } catch {
+        // В крайнем случае вернём очищенный текст
+        return clean;
+      }
     }
 
     try {
