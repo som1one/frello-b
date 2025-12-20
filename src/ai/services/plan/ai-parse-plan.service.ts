@@ -70,6 +70,20 @@ export class AiParsePlanService {
 
   formatPlanOutput(output: string, mealFrequency: number): string {
     this.logger.log("output in plan parse service", output);
+
+    // Санитизация: отрезаем всё до ключевых фраз, чтобы убрать лишние вступления
+    const sanitizeOutput = (text: string): string => {
+      const normIdx = text.toLowerCase().indexOf("ваша суточная норма калорий");
+      if (normIdx !== -1) {
+        text = text.slice(normIdx);
+      } else {
+        const dayIdx = text.toLowerCase().indexOf("день ");
+        if (dayIdx !== -1) text = text.slice(dayIdx);
+      }
+      return text.trim();
+    };
+
+    output = sanitizeOutput(output);
     if (!isJsonOutput(output)) {
       // Если не JSON, попробуем распарсить текстовую структуру плана и сформировать
       // единый формат вывода, чтобы в интерфейсе всегда были строки вида:
@@ -211,10 +225,12 @@ export class AiParsePlanService {
     
     // Извлекаем суточную норму калорий из вывода, если она есть
     let calorieNorm = "";
+    let calorieNormNumber: number | null = null;
     if (output) {
       const calorieMatch = output.match(/Ваша суточная норма калорий для достижения вашей цели:\s*(\d+)\s*ккал/i);
       if (calorieMatch) {
         calorieNorm = `Ваша суточная норма калорий для достижения вашей цели: ${calorieMatch[1]} ккал.\n`;
+        calorieNormNumber = parseInt(calorieMatch[1], 10) || null;
       }
     }
     
@@ -240,6 +256,33 @@ export class AiParsePlanService {
       prefix = plan[0].warning + "\n\n";
       plan[0] = { meals: plan[0].meals }; // Удаляем warning из первого дня
     }
+
+    // Если нашли норму калорий — заполним отсутствующие калории у приёмов пищи по типу
+    if (calorieNormNumber && plan?.length) {
+      const percMap: Record<string, number> = {
+        breakfast: 0.25,
+        lunch: 0.35,
+        dinner: 0.2,
+        snack: 0.1,
+        snack1: 0.1,
+        snack2: 0.1,
+        snack3: 0.08,
+      };
+      plan.forEach((day) => {
+        const meals = day.meals || [];
+        const percSum = meals.reduce((sum, m) => sum + (percMap[m.type] ?? 0.1), 0) || 1;
+        meals.forEach((m) => {
+          const perc = percMap[m.type] ?? 0.1;
+          if (!m.calories || m.calories <= 0) {
+            m.calories = Math.round((calorieNormNumber! * perc) / percSum);
+          }
+          if (!m.portionSize || m.portionSize <= 0) {
+            m.portionSize = 300; // разумный дефолт
+          }
+        });
+      });
+    }
+
     const result = plan
       .map((day, i) => {
         // Всегда используем формат "День 1", "День 2" и т.д.
