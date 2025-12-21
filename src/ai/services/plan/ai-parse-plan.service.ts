@@ -227,9 +227,12 @@ export class AiParsePlanService {
     let calorieNorm = "";
     let calorieNormNumber: number | null = null;
     if (output) {
-      const calorieMatch = output.match(/Ваша суточная норма калорий для достижения вашей цели:\s*(\d+)\s*ккал/i);
+      // Ищем разные варианты формата нормы калорий
+      const calorieMatch = output.match(/Ваша суточная норма калорий[^:]*:\s*(\d+)\s*ккал/i) ||
+                           output.match(/суточная норма[^:]*:\s*(\d+)\s*ккал/i) ||
+                           output.match(/норма калорий[^:]*:\s*(\d+)\s*ккал/i);
       if (calorieMatch) {
-        calorieNorm = `Ваша суточная норма калорий для достижения вашей цели: ${calorieMatch[1]} ккал.\n`;
+        calorieNorm = `Ваша суточная норма калорий: ${calorieMatch[1]} ккал.\n`;
         calorieNormNumber = parseInt(calorieMatch[1], 10) || null;
       }
     }
