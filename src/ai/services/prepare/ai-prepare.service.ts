@@ -638,7 +638,10 @@ ${settingsStr}.
 
     const mealFrequencyInstruction = `Количество приёмов пищи: ${mealFrequency}`;
 
-    const calorieTarget = targetCalories ? `Суточная норма: ${targetCalories} ккал.` : '';
+    // Если норма рассчитана — передаём ЯВНО, AI не может её менять
+    const calorieTarget = targetCalories 
+      ? `ОБЯЗАТЕЛЬНАЯ суточная норма калорий: ${targetCalories} ккал. НЕ МЕНЯЙ это число! Используй РОВНО ${targetCalories} ккал.` 
+      : 'Рассчитай суточную норму калорий по формуле Миффлина-Сан Жеора.';
 
     const planJsonInstruction = `${calorieTarget}`;
 
