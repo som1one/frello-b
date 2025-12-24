@@ -10,6 +10,7 @@ import {
   FRELLO_INSTRUCTION,
   PLAN_CONFIG,
 } from "src/ai/model/ai-plan.config";
+import { RequestType } from "@prisma/client";
 import { stripHtml } from "src/ai/model/stripHtml";
 import { getMealLabels } from "src/ai/model/meal-labels";
 
@@ -210,8 +211,16 @@ export class AiPrepareService {
       ? `\n\nКРИТИЧЕСКИ ВАЖНО - ОГРАНИЧЕНИЯ ИЗ ЧАТА: \nПользователь недавно писал: \n${extractedRestrictions.map(r => `- "${r}"`).join('\n')} \n\nЭТО ОЗНАЧАЕТ, ЧТО ТЫ ДОЛЖЕН ПОЛНОСТЬЮ ИСКЛЮЧИТЬ ЭТИ ПРОДУКТЫ / БЛЮДА ИЗ ПЛАНА!\nНЕ используй их НИ В КАКОМ ВИДЕ! НЕ пиши "замена" в скобках - просто НЕ ВКЛЮЧАЙ их!`
       : '';
 
-    const hasHistory = messages.some(m => !m.isUser);
-    const varietyInstruction = '';
+    // Если пользователь просит ещё один план — НЕ повторяем блюда из последних планов
+    const previousPlans = (messages || [])
+      .filter((m) => !m.isUser && m.aiResponseType === RequestType.MEAL_PLAN && m.content)
+      .slice(-2)
+      .map((m) => stripHtml(m.content))
+      .join("\n\n")
+      .slice(0, 5000);
+    const varietyInstruction = previousPlans
+      ? `\n\nКРИТИЧЕСКИ ВАЖНО - НОВЫЙ ПЛАН: НЕ ПОВТОРЯЙ блюда/рецепты/структуру из предыдущих планов пользователя. Вот предыдущие планы (запрещено повторять):\n${previousPlans}\nСгенерируй полностью новый набор блюд.`
+      : '';
 
     // НОВОЕ: Обработка гибких дней
     const flexibleDays = Array.isArray(userSettings.flexibleDays) ? userSettings.flexibleDays : [];

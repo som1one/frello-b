@@ -18,7 +18,8 @@ export class AiUserService {
 	async getMealFrequency(userId: string): Promise<number> {
 		try {
 			const settings = await this.userService.getSettings(userId)
-			return Math.max(1, Number(settings?.mealFrequency) || 4)
+			// Минимум 4 приёма пищи для планов питания
+			return Math.max(4, Number(settings?.mealFrequency) || 4)
 		} catch (error) {
 			this.logger.error('Failed to fetch user settings', error)
 			throw new HttpException(
