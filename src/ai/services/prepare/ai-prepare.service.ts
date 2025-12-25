@@ -1,6 +1,6 @@
 
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
-import { Message } from "@prisma/client";
+import { Message, RequestType } from "@prisma/client";
 import { CreateRecipeDto } from "src/dish/dto/create-recipe.dto";
 import { UserSettingsType } from "src/user/types/user";
 import { UserService } from "src/user/user.service";
@@ -10,7 +10,6 @@ import {
   FRELLO_INSTRUCTION,
   PLAN_CONFIG,
 } from "src/ai/model/ai-plan.config";
-import { RequestType } from "@prisma/client";
 import { stripHtml } from "src/ai/model/stripHtml";
 import { getMealLabels } from "src/ai/model/meal-labels";
 
@@ -174,14 +173,17 @@ export class AiPrepareService {
     messages: Message[];
     mealFrequency: number;
   }): Promise<PrepareMessage[]> {
+    // Минимум 4 приёма пищи
+    const actualMealFrequency = Math.max(mealFrequency, 4);
+    
     const { baseMessage, settingsBlock, settingsStr, userSettings } =
-      await this.basePrepareMessage({ userId: userId, mealFrequency });
+      await this.basePrepareMessage({ userId: userId, mealFrequency: actualMealFrequency });
 
     const calculatedCalories = this.calculateTargetCalories(userSettings);
     this.logger.log(`[preparePlanMessage] Calculated calories for user: ${calculatedCalories}`);
     const { mealFrequencyInstruction, planJsonInstruction, mealLabels } =
       this.preparePlan({
-        mealFrequency,
+        mealFrequency: actualMealFrequency,
         userSettings,
         settingsStr,
         targetCalories: calculatedCalories,
@@ -211,15 +213,18 @@ export class AiPrepareService {
       ? `\n\nКРИТИЧЕСКИ ВАЖНО - ОГРАНИЧЕНИЯ ИЗ ЧАТА: \nПользователь недавно писал: \n${extractedRestrictions.map(r => `- "${r}"`).join('\n')} \n\nЭТО ОЗНАЧАЕТ, ЧТО ТЫ ДОЛЖЕН ПОЛНОСТЬЮ ИСКЛЮЧИТЬ ЭТИ ПРОДУКТЫ / БЛЮДА ИЗ ПЛАНА!\nНЕ используй их НИ В КАКОМ ВИДЕ! НЕ пиши "замена" в скобках - просто НЕ ВКЛЮЧАЙ их!`
       : '';
 
-    // Если пользователь просит ещё один план — НЕ повторяем блюда из последних планов
-    const previousPlans = (messages || [])
-      .filter((m) => !m.isUser && m.aiResponseType === RequestType.MEAL_PLAN && m.content)
+    const hasHistory = messages.some(m => !m.isUser);
+    
+    // Если в чате уже был план питания - требуем новый уникальный план
+    const previousPlans = messages
+      .filter(m => !m.isUser && m.aiResponseType === RequestType.MEAL_PLAN)
       .slice(-2)
-      .map((m) => stripHtml(m.content))
-      .join("\n\n")
-      .slice(0, 5000);
+      .map(m => stripHtml(m.content))
+      .join('\n\n')
+      .slice(0, 2000); // Ограничиваем длину
+    
     const varietyInstruction = previousPlans
-      ? `\n\nКРИТИЧЕСКИ ВАЖНО - НОВЫЙ ПЛАН: НЕ ПОВТОРЯЙ блюда/рецепты/структуру из предыдущих планов пользователя. Вот предыдущие планы (запрещено повторять):\n${previousPlans}\nСгенерируй полностью новый набор блюд.`
+      ? `\n\nКРИТИЧЕСКИ ВАЖНО - РАЗНООБРАЗИЕ: В этом чате уже был план питания. Создай ПОЛНОСТЬЮ НОВЫЙ план с ДРУГИМИ блюдами. НЕ повторяй блюда из предыдущего плана. Используй другие рецепты и комбинации.`
       : '';
 
     // НОВОЕ: Обработка гибких дней

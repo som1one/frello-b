@@ -46,21 +46,6 @@ export class AiParsePlanService {
         calories = parseInt(cal?.replace(" ккал)", "")) || 0;
       }
 
-      // Валидация граммов: если калории/граммы > 3 ккал/г - пересчитываем
-      let finalPortionSize = portionSize;
-      if (calories > 0 && portionSize > 0) {
-        const kcalPerGram = calories / portionSize;
-        if (kcalPerGram > 3) {
-          // Пересчитываем: для готовых блюд обычно 1.5-2 ккал/г
-          const realisticKcalPerGram = 1.8;
-          finalPortionSize = Math.round(calories / realisticKcalPerGram);
-          this.logger.log(`Fixed unrealistic portion in text parse: ${calories} ккал / ${finalPortionSize} г (было ${portionSize} г, ${kcalPerGram.toFixed(2)} ккал/г)`);
-        }
-      } else if (calories > 0 && portionSize === 0) {
-        // Если граммы не указаны, рассчитываем реалистично
-        finalPortionSize = Math.round(calories / 1.8);
-      }
-
       return {
         type: mealTypeMap[type.toLowerCase()] || ("snack" as MealType),
         recipeName: recipeName,
@@ -73,7 +58,7 @@ export class AiParsePlanService {
         instruction: "",
         cookingTime: 0,
         dishId: 0,
-        portionSize: finalPortionSize,
+        portionSize: portionSize,
       };
     });
 
@@ -128,10 +113,7 @@ export class AiParsePlanService {
           ? [parsed]
           : [];
       this.logger.log("plan in plan parse service", output);
-      
-      // Обрабатываем через processParsedOutput чтобы убрать дубликаты и валидировать
-      const { planDetails } = this.processParsedOutput(plan, mealFrequency, parsed);
-      return this.constructPlanMessage(planDetails, mealFrequency, output);
+      return this.constructPlanMessage(plan, mealFrequency, output);
     } catch {
       return stripHtml(output); // Если JSON невалидный, возвращаем очищенный текст
     }
@@ -233,53 +215,13 @@ export class AiParsePlanService {
       return { meals };
     });
 
-    // Убираем дубликаты дней (дни с одинаковыми блюдами)
-    const uniquePlanDetails: PlanDay[] = [];
-    const seenDays = new Set<string>();
-    
-    planDetails.forEach((day) => {
-      // Создаём уникальный ключ из названий блюд
-      const dayKey = day.meals
-        .map(m => `${m.type}:${m.recipeName.toLowerCase().trim()}`)
-        .sort()
-        .join('|');
-      
-      if (!seenDays.has(dayKey)) {
-        seenDays.add(dayKey);
-        uniquePlanDetails.push(day);
-      } else {
-        this.logger.warn(`Removed duplicate day: ${dayKey}`);
-      }
-    });
-
-    const dishDetails = uniquePlanDetails[0]?.meals?.[0] || ({} as PlanMeal);
-    return { dishDetails, planDetails: uniquePlanDetails };
+    const dishDetails = planDetails[0]?.meals?.[0] || ({} as PlanMeal);
+    return { dishDetails, planDetails };
   }
 
   private constructPlanMessage(plan: PlanDay[], mealFrequency: number, output?: string): string {
     const mealLabels = getMealLabels(mealFrequency);
     this.logger.log("plan constructPlanMessage", plan);
-    
-    // Убираем дубликаты дней (если они всё ещё есть)
-    const uniquePlan: PlanDay[] = [];
-    const seenDays = new Set<string>();
-    
-    plan.forEach((day) => {
-      const dayKey = day.meals
-        .map(m => `${m.type}:${m.recipeName.toLowerCase().trim()}`)
-        .sort()
-        .join('|');
-      
-      if (!seenDays.has(dayKey)) {
-        seenDays.add(dayKey);
-        uniquePlan.push(day);
-      } else {
-        this.logger.warn(`Removed duplicate day in constructPlanMessage: ${dayKey}`);
-      }
-    });
-    
-    // Используем уникальный план
-    plan = uniquePlan;
     
     // Извлекаем суточную норму калорий из вывода, если она есть
     let calorieNorm = "";
@@ -339,18 +281,6 @@ export class AiParsePlanService {
           }
           if (!m.portionSize || m.portionSize <= 0) {
             m.portionSize = 300; // разумный дефолт
-          }
-          
-          // ВАЛИДАЦИЯ: проверяем реалистичность граммов
-          // Если калории/граммы > 3 ккал/г - это нереально, пересчитываем
-          if (m.calories > 0 && m.portionSize > 0) {
-            const kcalPerGram = m.calories / m.portionSize;
-            if (kcalPerGram > 3) {
-              // Пересчитываем: для готовых блюд обычно 1.5-2 ккал/г
-              const realisticKcalPerGram = 1.8; // среднее для готовых блюд
-              m.portionSize = Math.round(m.calories / realisticKcalPerGram);
-              this.logger.log(`Fixed unrealistic portion: ${m.calories} ккал / ${m.portionSize} г (было ${kcalPerGram.toFixed(2)} ккал/г)`);
-            }
           }
         });
       });
