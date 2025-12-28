@@ -6,11 +6,18 @@ import { ChatService } from "./chat.service";
 import { DishModule } from "src/dish/dish.module";
 import { UserModule } from "src/user/user.module";
 import { PlanModule } from "src/plan/plan.module";
+import { AiModule } from "src/ai/ai.module";
 
 @Module({
   controllers: [ChatController],
   providers: [ChatService, PrismaService],
-  imports: [HttpModule, forwardRef(() => DishModule), UserModule, forwardRef(() => PlanModule)],
+  imports: [
+    HttpModule,
+    forwardRef(() => DishModule),
+    UserModule,
+    forwardRef(() => PlanModule),
+    forwardRef(() => AiModule),
+  ],
   exports: [ChatService],
 })
 export class ChatModule {}
