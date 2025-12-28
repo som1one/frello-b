@@ -173,8 +173,8 @@ export class AiPrepareService {
     messages: Message[];
     mealFrequency: number;
   }): Promise<PrepareMessage[]> {
-    // Минимум 4 приёма пищи
-    const actualMealFrequency = Math.max(mealFrequency, 4);
+    // Минимум 4 приёма пищи, но если пользователь выбрал 4+ - используем его выбор
+    const actualMealFrequency = mealFrequency >= 4 ? mealFrequency : 4;
     
     const { baseMessage, settingsBlock, settingsStr, userSettings } =
       await this.basePrepareMessage({ userId: userId, mealFrequency: actualMealFrequency });

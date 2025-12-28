@@ -47,6 +47,12 @@ import { AiPlanGeneratorService } from "./services/ai-plan-generator/ai-plan-gen
     AiChatService,
     AiPlanGeneratorService,
   ],
-  exports: [AiRecipeService],
+  exports: [
+    AiRecipeService,
+    AiParsePlanService,
+    AiParseRecipeService,
+    AiPlanGeneratorService,
+    AiUserService,
+  ],
 })
 export class AiModule {}

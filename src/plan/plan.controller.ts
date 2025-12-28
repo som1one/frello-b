@@ -93,4 +93,13 @@ export class PlanController {
 
   @Delete(":id")
   remove(@Param("id") id: string) { }
+
+  @UseGuards(JwtAuthGuard, IsEmailConfirmedGuard)
+  @Post("save-from-message/:messageId")
+  async saveFromMessage(
+    @Param("messageId", ParseIntPipe) messageId: number,
+    @GetUserId() userId: string,
+  ) {
+    return await this.planService.saveFromMessage(messageId, userId);
+  }
 }
