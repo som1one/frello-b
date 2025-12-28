@@ -232,8 +232,13 @@ export class AiParsePlanService {
                            output.match(/суточная норма[^:]*:\s*(\d+)\s*ккал/i) ||
                            output.match(/норма калорий[^:]*:\s*(\d+)\s*ккал/i);
       if (calorieMatch) {
-        calorieNorm = `Ваша суточная норма калорий: ${calorieMatch[1]} ккал.\n`;
-        calorieNormNumber = parseInt(calorieMatch[1], 10) || null;
+        const extractedCalories = parseInt(calorieMatch[1], 10);
+        calorieNormNumber = extractedCalories || null;
+        
+        // Если в промпте была передана целевая норма, проверяем, что AI её не изменил
+        // (это проверяется в preparePlanMessage, где передается targetCalories)
+        // Здесь просто используем извлеченное значение
+        calorieNorm = `Ваша суточная норма калорий: ${extractedCalories} ккал.\n`;
       }
     }
     
@@ -281,6 +286,44 @@ export class AiParsePlanService {
           }
           if (!m.portionSize || m.portionSize <= 0) {
             m.portionSize = 300; // разумный дефолт
+          }
+          
+          // ВАЛИДАЦИЯ: Проверяем и исправляем нереалистичные соотношения калорий и граммов
+          if (m.portionSize > 0 && m.calories > 0) {
+            const caloriesPerGram = m.calories / m.portionSize;
+            
+            // Нереалистично высокое соотношение (больше 2.5 ккал/г для обычных блюд)
+            if (caloriesPerGram > 2.5) {
+              this.logger.warn(`Нереалистичное соотношение: ${m.portionSize}г = ${m.calories} ккал (${caloriesPerGram.toFixed(2)} ккал/г). Исправляю...`);
+              
+              // Исправляем: для обычных блюд максимум 2 ккал/г, для жирных - 2.5 ккал/г
+              const maxCaloriesPerGram = 2.0; // консервативное значение для обычных блюд
+              const correctedCalories = Math.round(m.portionSize * maxCaloriesPerGram);
+              
+              // Если исправление слишком сильно изменило калории, корректируем порцию
+              if (Math.abs(correctedCalories - m.calories) > m.calories * 0.3) {
+                // Корректируем порцию, чтобы сохранить калории
+                m.portionSize = Math.round(m.calories / maxCaloriesPerGram);
+                this.logger.log(`Скорректирована порция: ${m.portionSize}г для ${m.calories} ккал`);
+              } else {
+                m.calories = correctedCalories;
+                this.logger.log(`Скорректированы калории: ${m.calories} ккал для ${m.portionSize}г`);
+              }
+            }
+            
+            // Нереалистично низкое соотношение (меньше 0.3 ккал/г - слишком легкая еда)
+            if (caloriesPerGram < 0.3 && m.calories > 100) {
+              this.logger.warn(`Слишком низкое соотношение: ${m.portionSize}г = ${m.calories} ккал (${caloriesPerGram.toFixed(2)} ккал/г). Исправляю...`);
+              
+              // Для легких блюд минимум 0.5 ккал/г
+              const minCaloriesPerGram = 0.5;
+              const correctedCalories = Math.round(m.portionSize * minCaloriesPerGram);
+              
+              if (correctedCalories > m.calories) {
+                m.calories = correctedCalories;
+                this.logger.log(`Скорректированы калории: ${m.calories} ккал для ${m.portionSize}г`);
+              }
+            }
           }
         });
       });
