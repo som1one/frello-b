@@ -291,37 +291,67 @@ export class AiParsePlanService {
           // ВАЛИДАЦИЯ: Проверяем и исправляем нереалистичные соотношения калорий и граммов
           if (m.portionSize > 0 && m.calories > 0) {
             const caloriesPerGram = m.calories / m.portionSize;
+            const dishName = (m.recipeName || m.name || '').toLowerCase();
             
-            // Нереалистично высокое соотношение (больше 2.5 ккал/г для обычных блюд)
-            if (caloriesPerGram > 2.5) {
-              this.logger.warn(`Нереалистичное соотношение: ${m.portionSize}г = ${m.calories} ккал (${caloriesPerGram.toFixed(2)} ккал/г). Исправляю...`);
+            // Определяем тип блюда по названию для более точной валидации
+            let maxCaloriesPerGram = 2.0; // дефолт для обычных блюд
+            let minCaloriesPerGram = 0.5; // дефолт для легких блюд
+            
+            if (dishName.includes('салат') || dishName.includes('салата')) {
+              // Салаты: 0.3-0.8 ккал/г
+              maxCaloriesPerGram = 0.8;
+              minCaloriesPerGram = 0.3;
+            } else if (dishName.includes('суп') || dishName.includes('супа') || dishName.includes('борщ')) {
+              // Супы: 0.4-0.9 ккал/г
+              maxCaloriesPerGram = 0.9;
+              minCaloriesPerGram = 0.4;
+            } else if (dishName.includes('омлет') || dishName.includes('каша') || dishName.includes('творог') || dishName.includes('творожн')) {
+              // Завтраки: 1.0-1.8 ккал/г
+              maxCaloriesPerGram = 1.8;
+              minCaloriesPerGram = 1.0;
+            } else if (dishName.includes('паста') || dishName.includes('макарон') || dishName.includes('гречк') || dishName.includes('рис') || dishName.includes('пшено')) {
+              // Гарниры: 1.0-1.8 ккал/г
+              maxCaloriesPerGram = 1.8;
+              minCaloriesPerGram = 1.0;
+            } else if (dishName.includes('жарен') || dishName.includes('соус') || dishName.includes('майонез') || dishName.includes('жирн')) {
+              // Жирные блюда: 1.8-2.5 ккал/г (максимум)
+              maxCaloriesPerGram = 2.5;
+              minCaloriesPerGram = 1.8;
+            } else if (dishName.includes('куриц') || dishName.includes('мяс') || dishName.includes('говядин') || dishName.includes('рыб') || dishName.includes('индейк')) {
+              // Мясные блюда с гарниром: 1.2-2.0 ккал/г
+              maxCaloriesPerGram = 2.0;
+              minCaloriesPerGram = 1.2;
+            } else if (dishName.includes('орех') || dishName.includes('орехов')) {
+              // Орехи: могут быть до 6 ккал/г (это нормально)
+              maxCaloriesPerGram = 6.0;
+              minCaloriesPerGram = 4.0;
+            }
+            
+            // Проверяем превышение максимума
+            if (caloriesPerGram > maxCaloriesPerGram) {
+              this.logger.warn(`Нереалистичное соотношение для "${m.recipeName}": ${m.portionSize}г = ${m.calories} ккал (${caloriesPerGram.toFixed(2)} ккал/г, максимум ${maxCaloriesPerGram.toFixed(2)}). Исправляю...`);
               
-              // Исправляем: для обычных блюд максимум 2 ккал/г, для жирных - 2.5 ккал/г
-              const maxCaloriesPerGram = 2.0; // консервативное значение для обычных блюд
               const correctedCalories = Math.round(m.portionSize * maxCaloriesPerGram);
               
-              // Если исправление слишком сильно изменило калории, корректируем порцию
+              // Если исправление слишком сильно изменило калории (>30%), корректируем порцию
               if (Math.abs(correctedCalories - m.calories) > m.calories * 0.3) {
-                // Корректируем порцию, чтобы сохранить калории
                 m.portionSize = Math.round(m.calories / maxCaloriesPerGram);
-                this.logger.log(`Скорректирована порция: ${m.portionSize}г для ${m.calories} ккал`);
+                this.logger.log(`Скорректирована порция: ${m.portionSize}г для ${m.calories} ккал (${(m.calories / m.portionSize).toFixed(2)} ккал/г)`);
               } else {
                 m.calories = correctedCalories;
-                this.logger.log(`Скорректированы калории: ${m.calories} ккал для ${m.portionSize}г`);
+                this.logger.log(`Скорректированы калории: ${m.calories} ккал для ${m.portionSize}г (${(m.calories / m.portionSize).toFixed(2)} ккал/г)`);
               }
             }
             
-            // Нереалистично низкое соотношение (меньше 0.3 ккал/г - слишком легкая еда)
-            if (caloriesPerGram < 0.3 && m.calories > 100) {
-              this.logger.warn(`Слишком низкое соотношение: ${m.portionSize}г = ${m.calories} ккал (${caloriesPerGram.toFixed(2)} ккал/г). Исправляю...`);
+            // Проверяем слишком низкое соотношение (только для блюд с калориями > 100)
+            if (caloriesPerGram < minCaloriesPerGram && m.calories > 100) {
+              this.logger.warn(`Слишком низкое соотношение для "${m.recipeName}": ${m.portionSize}г = ${m.calories} ккал (${caloriesPerGram.toFixed(2)} ккал/г, минимум ${minCaloriesPerGram.toFixed(2)}). Исправляю...`);
               
-              // Для легких блюд минимум 0.5 ккал/г
-              const minCaloriesPerGram = 0.5;
               const correctedCalories = Math.round(m.portionSize * minCaloriesPerGram);
               
               if (correctedCalories > m.calories) {
                 m.calories = correctedCalories;
-                this.logger.log(`Скорректированы калории: ${m.calories} ккал для ${m.portionSize}г`);
+                this.logger.log(`Скорректированы калории: ${m.calories} ккал для ${m.portionSize}г (${(m.calories / m.portionSize).toFixed(2)} ккал/г)`);
               }
             }
           }
