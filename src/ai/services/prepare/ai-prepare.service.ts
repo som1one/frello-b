@@ -463,8 +463,8 @@ ${settingsStr}.
               'flexibleDayFrequency': 'Частота гибких дней',
               // 'flexibleDayType': 'Тип гибкого дня',
               'flexibleDays': 'Конкретные гибкие дни',
-              'hasOven': 'Есть ли у вас доступ к духовке?',
-              'currentProducts': 'Продукты, которые у пользователя есть'
+              'hasOven': 'Есть ли у вас доступ к духовке?'
+              // 'currentProducts': 'Продукты, которые у пользователя есть' - убрано, не используется
             };
 
             const fieldLabel = fieldLabels[key] || key;
@@ -472,19 +472,13 @@ ${settingsStr}.
           })
           .filter(Boolean);
 
-        // Добавляем поле currentProducts после favoriteFoods
-        const currentProductsField = userSettings.currentProducts
-          ? `Продукты, которые у пользователя есть: ${userSettings.currentProducts}`
-          : null;
+        // Поле currentProducts убрано - не используется в промпте
+        // const currentProductsField = userSettings.currentProducts
+        //   ? `Продукты, которые у пользователя есть: ${userSettings.currentProducts}`
+        //   : null;
 
         const allFields = [...coreFields, ...arrayFields];
-        // Вставляем currentProducts после favoriteFoods
-        const favoriteFoodsIndex = allFields.findIndex(field => field && field.includes('Любимые продукты, блюда и напитки'));
-        if (favoriteFoodsIndex !== -1 && currentProductsField) {
-          allFields.splice(favoriteFoodsIndex + 1, 0, currentProductsField);
-        } else if (currentProductsField) {
-          allFields.push(currentProductsField);
-        }
+        // Вставка currentProducts убрана
 
         return allFields.join("; ");
       })()
