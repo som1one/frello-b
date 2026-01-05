@@ -7,6 +7,7 @@ import { UserService } from "src/user/user.service";
 import { AiDishService } from "../dish/ai-dish.service";
 import {
   BASE_SYSTEM_MESSAGE,
+  BASE_SYSTEM_MESSAGE_V2,
   FRELLO_INSTRUCTION,
   PLAN_CONFIG,
 } from "src/ai/model/ai-plan.config";
@@ -499,7 +500,8 @@ ${settingsStr}.
       : "";
 
     return {
-      baseMessage: BASE_SYSTEM_MESSAGE,
+      // Используем более «жёсткий» и реалистичный промпт
+      baseMessage: BASE_SYSTEM_MESSAGE_V2,
       settingsStr,
       settingsBlock,
       userSettings,
