@@ -13,7 +13,7 @@ export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
 
   private readonly apiConfig = {
-    model: "gemini-2.5-flash-lite",
+    model: "deepseek-v3.2",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
@@ -41,7 +41,7 @@ export class AiHttpClientService {
     try {
       const { data } = await firstValueFrom(
         this.httpService.post(
-          `${baseUrl}/networks/gemini-2-5-flash-lite`,
+          `${baseUrl}/networks/deepseek-v3-2`,
           {
             model,
             messages,
