@@ -500,8 +500,8 @@ ${settingsStr}.
       : "";
 
     return {
-      // Используем более «жёсткий» и реалистичный промпт
-      baseMessage: BASE_SYSTEM_MESSAGE_V2,
+      // Используем новый промпт с алгоритмом расчета калорий
+      baseMessage: BASE_SYSTEM_MESSAGE,
       settingsStr,
       settingsBlock,
       userSettings,
