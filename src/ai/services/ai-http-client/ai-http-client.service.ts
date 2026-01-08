@@ -18,6 +18,11 @@ export class AiHttpClientService {
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
+    // Возможные варианты endpoint для DeepSeek:
+    // - /networks/deepseek-v3-2 (текущий)
+    // - /networks/deepseek
+    // - /networks/deepseek-chat
+    endpoint: process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-v3-2",
   };
 
   constructor(private readonly httpService: HttpService) { }
@@ -39,9 +44,17 @@ export class AiHttpClientService {
     }
 
     try {
+      const endpoint = this.apiConfig.endpoint;
+      const fullUrl = `${baseUrl}${endpoint}`;
+      
+      this.logger.log(`Making request to: ${fullUrl}`, {
+        model,
+        hasApiKey: !!apiKey,
+      });
+
       const { data } = await firstValueFrom(
         this.httpService.post(
-          `${baseUrl}/networks/deepseek-v3-2`,
+          fullUrl,
           {
             model,
             messages,
@@ -82,7 +95,19 @@ export class AiHttpClientService {
 
     } catch (error) {
 
-      this.logger.error("Error fetching API response", error);
+      const endpoint = this.apiConfig.endpoint;
+      const fullUrl = `${baseUrl}${endpoint}`;
+      
+      this.logger.error("Error fetching API response", {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: fullUrl,
+        model,
+        hasApiKey: !!apiKey,
+        endpoint,
+      });
 
       if (error.response?.status === 429) {
 
@@ -115,6 +140,20 @@ export class AiHttpClientService {
           "Некорректный API ключ",
 
           HttpStatus.UNAUTHORIZED,
+
+        );
+
+      }
+
+      if (error.response?.status === 404) {
+
+        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_DEEPSEEK_ENDPOINT env variable to: /networks/deepseek or /networks/deepseek-chat");
+
+        throw new HttpException(
+
+          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели DeepSeek.`,
+
+          HttpStatus.NOT_FOUND,
 
         );
 
