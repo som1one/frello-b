@@ -13,16 +13,13 @@ export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
 
   private readonly apiConfig = {
-    model: "deepseek-v3.2",
+    model: "deepseek-chat",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
-    // Возможные варианты endpoint для DeepSeek:
-    // - /networks/deepseek-v3-2 (текущий)
-    // - /networks/deepseek
-    // - /networks/deepseek-chat
-    endpoint: process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-v3-2",
+    // Endpoint для DeepSeek Chat
+    endpoint: process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-chat",
   };
 
   constructor(private readonly httpService: HttpService) { }
