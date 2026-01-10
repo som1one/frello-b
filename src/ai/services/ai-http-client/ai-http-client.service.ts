@@ -56,8 +56,7 @@ export class AiHttpClientService {
         messages,
         temperature,
         max_tokens: maxTokens,
-        // Убираем is_sync, так как возможно он не поддерживается или вызывает проблемы
-        // is_sync: true,
+        is_sync: true, // Обязательно для синхронного запроса
       };
 
       this.logger.log(`Making request to: ${fullUrl}`, {
@@ -82,6 +81,20 @@ export class AiHttpClientService {
       );
 
       this.logger.log("Full API response structure:", JSON.stringify(data, null, 2));
+
+      // Проверка на асинхронный статус (processing)
+      if (data.status === "processing" || data.status === "pending") {
+        this.logger.error("API returned processing status - async request not supported", {
+          status: data.status,
+          requestId: data.request_id,
+          fullResponse: JSON.stringify(data, null, 2),
+        });
+
+        throw new HttpException(
+          `API вернул статус "processing" - запрос обрабатывается асинхронно. Request ID: ${data.request_id || "неизвестен"}. Убедитесь, что параметр is_sync: true установлен.`,
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
 
       // Проверяем различные варианты структуры ответа
       let content = "";
