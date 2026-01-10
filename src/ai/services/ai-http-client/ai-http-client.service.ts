@@ -13,12 +13,12 @@ export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
 
   private readonly apiConfig = {
-    model: "deepseek",
+    model: "deepseek-chat",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
-    // Endpoint для DeepSeek
+    // Endpoint для DeepSeek Chat
     endpoint: process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-chat",
   };
 
@@ -44,21 +44,26 @@ export class AiHttpClientService {
       const endpoint = this.apiConfig.endpoint;
       const fullUrl = `${baseUrl}${endpoint}`;
       
+      const requestBody = {
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        is_sync: true,
+      };
+
       this.logger.log(`Making request to: ${fullUrl}`, {
         model,
         hasApiKey: !!apiKey,
+        messagesCount: messages.length,
+        temperature,
+        max_tokens: maxTokens,
       });
 
       const { data } = await firstValueFrom(
         this.httpService.post(
           fullUrl,
-          {
-            model,
-            messages,
-            temperature,
-            max_tokens: maxTokens,
-            is_sync: true,
-          },
+          requestBody,
           {
             headers: { Authorization: `Bearer ${apiKey}` },
             timeout: 180000, // 180 секунд таймаут для безопасности
@@ -143,17 +148,33 @@ export class AiHttpClientService {
       }
 
       if (error.response?.status === 404) {
-
         this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_DEEPSEEK_ENDPOINT env variable to: /networks/deepseek or /networks/deepseek-chat");
 
         throw new HttpException(
-
           `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели DeepSeek.`,
-
           HttpStatus.NOT_FOUND,
-
         );
+      }
 
+      if (error.response?.status === 422) {
+        const errorData = error.response?.data;
+        this.logger.error("422 Unprocessable Entity - Invalid request format", {
+          url: fullUrl,
+          model,
+          errorData: JSON.stringify(errorData, null, 2),
+          requestBody: JSON.stringify({
+            model,
+            messagesCount: messages.length,
+            temperature,
+            max_tokens: maxTokens,
+            is_sync: true,
+          }, null, 2),
+        });
+
+        throw new HttpException(
+          `Некорректный формат запроса к API. Проверьте название модели и структуру данных. Ответ API: ${JSON.stringify(errorData)}`,
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        );
       }
 
       throw error
