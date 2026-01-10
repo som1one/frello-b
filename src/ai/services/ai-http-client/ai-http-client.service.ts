@@ -77,11 +77,20 @@ export class AiHttpClientService {
       let content = "";
       let finishReason = "";
 
-      // Вариант 1: data.response[0]?.message?.content (Gemini формат)
+      // Вариант 1: data.response[0] - массив строк (DeepSeek Chat формат)
       if (data.response && Array.isArray(data.response) && data.response[0]) {
-        finishReason = data.response[0]?.finish_reason || "";
-        content = data.response[0]?.message?.content || data.response[0]?.content || "";
-        this.logger.log("Parsed from response array:", { finishReason, contentLength: content.length });
+        const firstItem = data.response[0];
+        // Если элемент массива - строка (DeepSeek Chat формат)
+        if (typeof firstItem === "string") {
+          content = firstItem;
+          this.logger.log("Parsed from response array (string format):", { contentLength: content.length });
+        }
+        // Если элемент массива - объект (Gemini формат)
+        else if (typeof firstItem === "object") {
+          finishReason = firstItem?.finish_reason || "";
+          content = firstItem?.message?.content || firstItem?.content || "";
+          this.logger.log("Parsed from response array (object format):", { finishReason, contentLength: content.length });
+        }
       }
       // Вариант 2: data.choices[0]?.message?.content (OpenAI формат)
       else if (data.choices && Array.isArray(data.choices) && data.choices[0]) {
