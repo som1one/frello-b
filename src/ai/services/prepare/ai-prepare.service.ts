@@ -7,7 +7,6 @@ import { UserService } from "src/user/user.service";
 import { AiDishService } from "../dish/ai-dish.service";
 import {
   BASE_SYSTEM_MESSAGE,
-  BASE_SYSTEM_MESSAGE_V2,
   FRELLO_INSTRUCTION,
   PLAN_CONFIG,
 } from "src/ai/model/ai-plan.config";
