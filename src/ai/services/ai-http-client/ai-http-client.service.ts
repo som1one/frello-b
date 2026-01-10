@@ -44,20 +44,30 @@ export class AiHttpClientService {
       const endpoint = this.apiConfig.endpoint;
       const fullUrl = `${baseUrl}${endpoint}`;
       
+      // Логируем структуру сообщений (без полного контента для экономии места)
+      const messagesStructure = messages.map(msg => ({
+        role: msg.role,
+        contentLength: msg.content?.length || 0,
+        contentPreview: msg.content?.substring(0, 100) || "",
+      }));
+
       const requestBody = {
         model,
         messages,
         temperature,
         max_tokens: maxTokens,
-        is_sync: true,
+        // Убираем is_sync, так как возможно он не поддерживается или вызывает проблемы
+        // is_sync: true,
       };
 
       this.logger.log(`Making request to: ${fullUrl}`, {
         model,
         hasApiKey: !!apiKey,
         messagesCount: messages.length,
+        messagesStructure: JSON.stringify(messagesStructure, null, 2),
         temperature,
         max_tokens: maxTokens,
+        requestBodyKeys: Object.keys(requestBody),
       });
 
       const { data } = await firstValueFrom(
@@ -124,6 +134,7 @@ export class AiHttpClientService {
         firstChars: content?.substring(0, 100) || "empty"
       });
 
+      // Проверка на пустой контент
       if (!content?.trim() || content === "[]") {
         this.logger.error("Empty or invalid response content", {
           rawData: JSON.stringify(data, null, 2),
@@ -134,6 +145,34 @@ export class AiHttpClientService {
         throw new HttpException(
           `Пустой ответ от API. Структура ответа: ${JSON.stringify(data)}`,
           HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+
+      // Проверка на сообщения об ошибках от API
+      const errorMessages = [
+        "Произошла ошибка",
+        "ошибка",
+        "error",
+        "failed",
+        "недоступен",
+        "unavailable",
+      ];
+
+      const contentLower = content.toLowerCase();
+      const isErrorMessage = errorMessages.some(msg => contentLower.includes(msg.toLowerCase()));
+
+      if (isErrorMessage && content.length < 200) {
+        // Если это короткое сообщение об ошибке (менее 200 символов), скорее всего это ошибка API
+        this.logger.error("API returned error message", {
+          errorMessage: content,
+          rawData: JSON.stringify(data, null, 2),
+          requestId: data.request_id,
+          model: data.model,
+        });
+
+        throw new HttpException(
+          `API вернул ошибку: ${content}. Request ID: ${data.request_id || "неизвестен"}`,
+          HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
 
