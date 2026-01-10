@@ -71,26 +71,61 @@ export class AiHttpClientService {
         ),
       );
 
-      this.logger.log("Response from model", data);
+      this.logger.log("Full API response structure:", JSON.stringify(data, null, 2));
 
-      const finishReason = data.response[0]?.finish_reason;
+      // Проверяем различные варианты структуры ответа
+      let content = "";
+      let finishReason = "";
 
-      this.logger.log("Finish reason:", finishReason);
+      // Вариант 1: data.response[0]?.message?.content (Gemini формат)
+      if (data.response && Array.isArray(data.response) && data.response[0]) {
+        finishReason = data.response[0]?.finish_reason || "";
+        content = data.response[0]?.message?.content || data.response[0]?.content || "";
+        this.logger.log("Parsed from response array:", { finishReason, contentLength: content.length });
+      }
+      // Вариант 2: data.choices[0]?.message?.content (OpenAI формат)
+      else if (data.choices && Array.isArray(data.choices) && data.choices[0]) {
+        finishReason = data.choices[0]?.finish_reason || "";
+        content = data.choices[0]?.message?.content || "";
+        this.logger.log("Parsed from choices array:", { finishReason, contentLength: content.length });
+      }
+      // Вариант 3: data.content или data.message (прямой формат)
+      else if (data.content) {
+        content = data.content;
+        this.logger.log("Parsed from direct content:", { contentLength: content.length });
+      }
+      else if (data.message) {
+        content = typeof data.message === "string" ? data.message : data.message.content || "";
+        this.logger.log("Parsed from direct message:", { contentLength: content.length });
+      }
+      // Вариант 4: data.text
+      else if (data.text) {
+        content = data.text;
+        this.logger.log("Parsed from text field:", { contentLength: content.length });
+      }
+      else {
+        this.logger.error("Unknown response structure. Full data:", JSON.stringify(data, null, 2));
+        content = "";
+      }
 
-      const content = data.response[0]?.message?.content || "";
-
-      this.logger.log("Content from model", content);
+      this.logger.log("Final content:", { 
+        contentLength: content?.length || 0, 
+        isEmpty: !content?.trim(), 
+        isBrackets: content === "[]",
+        firstChars: content?.substring(0, 100) || "empty"
+      });
 
       if (!content?.trim() || content === "[]") {
+        this.logger.error("Empty or invalid response content", {
+          rawData: JSON.stringify(data, null, 2),
+          contentLength: content?.length || 0,
+          contentPreview: content?.substring(0, 200) || "empty",
+        });
 
         throw new HttpException(
-
-          "Empty response from API",
-
+          `Пустой ответ от API. Структура ответа: ${JSON.stringify(data)}`,
           HttpStatus.INTERNAL_SERVER_ERROR,
-
         );
-
       }
 
       return content;
