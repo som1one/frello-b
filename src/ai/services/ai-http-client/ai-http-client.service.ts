@@ -19,7 +19,7 @@ export class AiHttpClientService {
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
     // Endpoint для gpt-4-turbo
-    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-4-turbo",
+    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/openai-gpt-4-turbo",
   };
 
   constructor(private readonly httpService: HttpService) { }
@@ -244,10 +244,10 @@ export class AiHttpClientService {
       }
 
       if (error.response?.status === 404) {
-        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_GPT_ENDPOINT env variable to: /networks/gpt-4-turbo or /networks/openai-gpt-4-turbo");
+        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_GPT_ENDPOINT env variable. Common endpoints: /networks/openai-gpt-4-turbo, /networks/gpt-4-turbo, /networks/gpt-4-turbo-preview");
 
         throw new HttpException(
-          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели gpt-4-turbo.`,
+          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели gpt-4-turbo. Попробуйте установить переменную окружения GENAPI_GPT_ENDPOINT.`,
           HttpStatus.NOT_FOUND,
         );
       }
