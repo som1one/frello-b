@@ -40,6 +40,16 @@ export class AiHttpClientService {
       );
     }
 
+    // Определяем, является ли модель DeepSeek (для DeepSeek нужен is_sync, для GPT - возможно другой формат)
+    const isDeepSeek = model.toLowerCase().includes('deepseek');
+    
+    // Формируем тело запроса в зависимости от типа модели
+    const requestBody: any = {
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    };
+
     try {
       const endpoint = this.apiConfig.endpoint;
       const fullUrl = `${baseUrl}${endpoint}`;
@@ -51,37 +61,46 @@ export class AiHttpClientService {
         contentPreview: msg.content?.substring(0, 100) || "",
       }));
 
-      // Определяем, является ли модель DeepSeek (для DeepSeek нужен is_sync, для GPT - возможно другой формат)
-      const isDeepSeek = model.toLowerCase().includes('deepseek');
-      
-      // Формируем тело запроса в зависимости от типа модели
-      const requestBody: any = {
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-      };
-
       // Для DeepSeek добавляем model и is_sync
       if (isDeepSeek) {
         requestBody.model = model;
         requestBody.is_sync = true;
       } else {
-        // Для GPT моделей пробуем с model, но без is_sync
-        // Если это не работает, можно попробовать убрать model через переменную окружения
-        const includeModelInBody = process.env.GENAPI_INCLUDE_MODEL_IN_BODY !== 'false';
-        if (includeModelInBody) {
-          requestBody.model = model;
+        // Для GPT моделей пробуем разные варианты в зависимости от переменной окружения
+        const gptRequestFormat = process.env.GENAPI_GPT_REQUEST_FORMAT || 'with_model_without_sync';
+        
+        switch (gptRequestFormat) {
+          case 'with_model_with_sync':
+            // Вариант 1: с model и is_sync (как для DeepSeek)
+            requestBody.model = model;
+            requestBody.is_sync = true;
+            break;
+          case 'without_model_with_sync':
+            // Вариант 2: без model, но с is_sync
+            requestBody.is_sync = true;
+            break;
+          case 'with_model_without_sync':
+            // Вариант 3: с model, но без is_sync (текущий)
+            requestBody.model = model;
+            break;
+          case 'without_model_without_sync':
+            // Вариант 4: без model и без is_sync
+            break;
+          default:
+            // По умолчанию: с model, но без is_sync
+            requestBody.model = model;
         }
-        // Не добавляем is_sync для GPT моделей
       }
 
       this.logger.log(`Making request to: ${fullUrl}`, {
         model,
+        isDeepSeek,
         hasApiKey: !!apiKey,
         messagesCount: messages.length,
         messagesStructure: JSON.stringify(messagesStructure, null, 2),
         temperature,
         max_tokens: maxTokens,
+        requestBody: JSON.stringify(requestBody, null, 2),
         requestBodyKeys: Object.keys(requestBody),
       });
 
@@ -270,21 +289,18 @@ export class AiHttpClientService {
 
       if (error.response?.status === 422) {
         const errorData = error.response?.data;
+        
         this.logger.error("422 Unprocessable Entity - Invalid request format", {
           url: fullUrl,
           model,
+          isDeepSeek,
           errorData: JSON.stringify(errorData, null, 2),
-          requestBody: JSON.stringify({
-            model,
-            messagesCount: messages.length,
-            temperature,
-            max_tokens: maxTokens,
-            is_sync: true,
-          }, null, 2),
+          requestBody: JSON.stringify(requestBody, null, 2),
+          gptRequestFormat: process.env.GENAPI_GPT_REQUEST_FORMAT || 'with_model_without_sync',
         });
 
         throw new HttpException(
-          `Некорректный формат запроса к API. Проверьте название модели и структуру данных. Ответ API: ${JSON.stringify(errorData)}`,
+          `Некорректный формат запроса к API. Проверьте название модели и структуру данных. Ответ API: ${JSON.stringify(errorData)}. Попробуйте установить переменную окружения GENAPI_GPT_REQUEST_FORMAT (with_model_with_sync, without_model_with_sync, with_model_without_sync, without_model_without_sync)`,
           HttpStatus.UNPROCESSABLE_ENTITY,
         );
       }
