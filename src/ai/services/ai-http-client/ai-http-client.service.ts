@@ -13,13 +13,13 @@ export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
 
   private readonly apiConfig = {
-    model: "deepseek-chat",
+    model: "gpt-4o-mini",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
-    // Endpoint для DeepSeek Chat
-    endpoint: process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-chat",
+    // Endpoint для GPT-4o-mini
+    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-4o-mini",
   };
 
   constructor(private readonly httpService: HttpService) { }
@@ -244,10 +244,10 @@ export class AiHttpClientService {
       }
 
       if (error.response?.status === 404) {
-        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_DEEPSEEK_ENDPOINT env variable to: /networks/deepseek or /networks/deepseek-chat");
+        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_GPT_ENDPOINT env variable to: /networks/gpt-4o-mini or /networks/openai-gpt-4o-mini");
 
         throw new HttpException(
-          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели DeepSeek.`,
+          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели GPT-4o-mini.`,
           HttpStatus.NOT_FOUND,
         );
       }
