@@ -18,8 +18,9 @@ export class AiHttpClientService {
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
-    // Endpoint для gpt-5-mini (можно переопределить через GENAPI_GPT_ENDPOINT)
-    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-5-mini",
+    // Endpoint для GPT моделей (можно переопределить через GENAPI_GPT_ENDPOINT)
+    // Пробуем разные варианты: /networks/openai, /networks/gpt-4, /networks/gpt-4-turbo
+    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/openai",
   };
 
   constructor(private readonly httpService: HttpService) { }
@@ -279,10 +280,23 @@ export class AiHttpClientService {
       }
 
       if (error.response?.status === 404) {
-        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_GPT_ENDPOINT env variable. Common endpoints: /networks/gpt-5-mini, /networks/gpt-5, /networks/openai-gpt-5-mini");
+        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_GPT_ENDPOINT env variable.", {
+          currentEndpoint: endpoint,
+          currentModel: model,
+          fullUrl,
+          suggestedEndpoints: [
+            "/networks/openai",
+            "/networks/gpt-4",
+            "/networks/gpt-4-turbo",
+            "/networks/gpt-5-mini",
+            "/networks/gpt-5",
+            "/networks/openai-gpt-4-turbo",
+            "/networks/openai-gpt-5-mini",
+          ],
+        });
 
         throw new HttpException(
-          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели gpt-5-mini. Попробуйте установить переменную окружения GENAPI_GPT_ENDPOINT.`,
+          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели ${model}. Попробуйте установить переменную окружения GENAPI_GPT_ENDPOINT. Возможные варианты: /networks/openai, /networks/gpt-4, /networks/gpt-4-turbo`,
           HttpStatus.NOT_FOUND,
         );
       }
