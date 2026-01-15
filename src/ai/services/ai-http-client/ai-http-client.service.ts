@@ -51,13 +51,29 @@ export class AiHttpClientService {
         contentPreview: msg.content?.substring(0, 100) || "",
       }));
 
-      const requestBody = {
-        model,
+      // Определяем, является ли модель DeepSeek (для DeepSeek нужен is_sync, для GPT - возможно другой формат)
+      const isDeepSeek = model.toLowerCase().includes('deepseek');
+      
+      // Формируем тело запроса в зависимости от типа модели
+      const requestBody: any = {
         messages,
         temperature,
         max_tokens: maxTokens,
-        is_sync: true, // Обязательно для синхронного запроса
       };
+
+      // Для DeepSeek добавляем model и is_sync
+      if (isDeepSeek) {
+        requestBody.model = model;
+        requestBody.is_sync = true;
+      } else {
+        // Для GPT моделей пробуем с model, но без is_sync
+        // Если это не работает, можно попробовать убрать model через переменную окружения
+        const includeModelInBody = process.env.GENAPI_INCLUDE_MODEL_IN_BODY !== 'false';
+        if (includeModelInBody) {
+          requestBody.model = model;
+        }
+        // Не добавляем is_sync для GPT моделей
+      }
 
       this.logger.log(`Making request to: ${fullUrl}`, {
         model,
