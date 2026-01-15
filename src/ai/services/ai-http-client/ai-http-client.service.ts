@@ -18,9 +18,9 @@ export class AiHttpClientService {
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
-    // Endpoint для GPT моделей (можно переопределить через GENAPI_GPT_ENDPOINT)
-    // Пробуем разные варианты: /networks/openai, /networks/gpt-4, /networks/gpt-4-turbo
-    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/openai",
+    // Endpoint для gpt-5-mini (можно переопределить через GENAPI_GPT_ENDPOINT)
+    // Если не работает, попробуйте: /networks/openai, /networks/gpt-4, /networks/gpt-4-turbo
+    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-5-mini",
   };
 
   constructor(private readonly httpService: HttpService) { }
