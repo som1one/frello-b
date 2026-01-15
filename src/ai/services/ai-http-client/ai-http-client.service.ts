@@ -13,13 +13,13 @@ export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
 
   private readonly apiConfig = {
-    model: "GPT-5-mini",
+    model: "chat-gpt-4-turbo",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
-    // Endpoint для GPT-5-mini
-    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-5-mini",
+    // Endpoint для chat-gpt-4-turbo
+    endpoint: process.env.GENAPI_GPT_ENDPOINT || "/networks/chat-gpt-4-turbo",
   };
 
   constructor(private readonly httpService: HttpService) { }
@@ -244,10 +244,10 @@ export class AiHttpClientService {
       }
 
       if (error.response?.status === 404) {
-        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_GPT_ENDPOINT env variable to: /networks/gpt-5-mini or /networks/GPT-5-mini");
+        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_GPT_ENDPOINT env variable to: /networks/chat-gpt-4-turbo or /networks/gpt-4-turbo");
 
         throw new HttpException(
-          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели GPT-5-mini.`,
+          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели chat-gpt-4-turbo.`,
           HttpStatus.NOT_FOUND,
         );
       }
