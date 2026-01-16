@@ -1,59 +1,20 @@
 import { HttpService } from "@nestjs/axios";
-
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
-
 import { firstValueFrom } from "rxjs";
-
 import { MessageRole } from "../prepare/ai-prepare.service";
 
 @Injectable()
-
 export class AiHttpClientService {
-
   private readonly logger = new Logger(AiHttpClientService.name);
-
   private readonly apiConfig = {
-    // Модель можно переопределить через GENAPI_MODEL (по умолчанию gpt-5-mini)
-    model: process.env.GENAPI_MODEL || "gpt-5-mini",
+    model: "gpt-4.1-nano",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
   };
 
-  private getEndpoint(): string {
-    // Если указан явный endpoint через переменную окружения - используем его
-    if (process.env.GENAPI_ENDPOINT) {
-      return process.env.GENAPI_ENDPOINT;
-    }
-
-    const model = this.apiConfig.model.toLowerCase();
-    
-    // Для GPT моделей пробуем специфичные endpoints
-    if (model.includes('gpt-5-mini') || model.includes('gpt5mini')) {
-      // Пробуем специфичный endpoint для gpt-5-mini
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/openai-gpt-5-mini";
-    }
-    if (model.includes('gpt-5') || model.includes('gpt5')) {
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-5";
-    }
-    if (model.includes('gpt-4-turbo') || model.includes('gpt4turbo')) {
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/openai-gpt-4-turbo";
-    }
-    if (model.includes('gpt-4') || model.includes('gpt4')) {
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-4";
-    }
-    if (model.includes('gpt')) {
-      // Для любых других GPT моделей пробуем общий endpoint
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/openai";
-    }
-    
-    // По умолчанию для GPT моделей
-    return process.env.GENAPI_GPT_ENDPOINT || "/networks/openai";
-  }
-
   constructor(private readonly httpService: HttpService) { }
-
   async fetchApiResponse(
     messages: { role: MessageRole; content: string }[],
     options: { temperature?: number; maxTokens?: number } = {},
@@ -70,282 +31,97 @@ export class AiHttpClientService {
       );
     }
 
-    // Формируем тело запроса для GPT моделей
-    const requestBody: any = {
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    };
-
     try {
-      const endpoint = this.getEndpoint();
-      const fullUrl = `${baseUrl}${endpoint}`;
-      
-      // Логируем структуру сообщений (без полного контента для экономии места)
-      const messagesStructure = messages.map(msg => ({
-        role: msg.role,
-        contentLength: msg.content?.length || 0,
-        contentPreview: msg.content?.substring(0, 100) || "",
-      }));
-
-      // Для GPT моделей пробуем разные варианты в зависимости от переменной окружения
-      // По умолчанию используем формат с model и is_sync
-      const gptRequestFormat = process.env.GENAPI_GPT_REQUEST_FORMAT || 'with_model_with_sync';
-      
-      switch (gptRequestFormat) {
-        case 'with_model_with_sync':
-          // Вариант 1: с model и is_sync - ПО УМОЛЧАНИЮ
-          requestBody.model = model;
-          requestBody.is_sync = true;
-          break;
-        case 'without_model_with_sync':
-          // Вариант 2: без model, но с is_sync
-          requestBody.is_sync = true;
-          break;
-        case 'with_model_without_sync':
-          // Вариант 3: с model, но без is_sync
-          requestBody.model = model;
-          break;
-        case 'without_model_without_sync':
-          // Вариант 4: без model и без is_sync
-          break;
-        default:
-          // По умолчанию: с model и is_sync
-          requestBody.model = model;
-          requestBody.is_sync = true;
-      }
-
-      this.logger.log(`Making request to: ${fullUrl}`, {
-        model,
-        hasApiKey: !!apiKey,
-        messagesCount: messages.length,
-        messagesStructure: JSON.stringify(messagesStructure, null, 2),
-        temperature,
-        max_tokens: maxTokens,
-        requestBody: JSON.stringify(requestBody, null, 2),
-        requestBodyKeys: Object.keys(requestBody),
-      });
-
       const { data } = await firstValueFrom(
         this.httpService.post(
-          fullUrl,
-          requestBody,
+          `${baseUrl}/networks/gpt-4-1`,
+          {
+            model,
+            messages,
+            temperature,
+            max_tokens: maxTokens,
+            is_sync: true,
+          },
           {
             headers: { Authorization: `Bearer ${apiKey}` },
-            timeout: 180000, // 180 секунд таймаут для безопасности
+            timeout: 90000, // 90 секунд таймаут для безопасности
           },
         ),
       );
 
-      this.logger.log("Full API response structure:", JSON.stringify(data, null, 2));
+      // const data = {
+      //   request_id: 27156506,
+      //   model: "gpt-4-1",
+      //   cost: 0.0034,
+      //   response: [
+      //     {
+      //       index: 0,
+      //       message: {
+      //         role: "assistant",
+      //         content:
+      //           '{\n  "name": "Гречка с курицей qjgnf",\n  "ingredients": "Куриная грудка - 200 г\\nГречневая крупа - 100 г\\nВода - 200 мл\\nСоль - по вкусу\\nМасло растительное - 1 ст. ложка",\n  "instruction": "Промойте гречку.\\nОбжарьте куриную грудку на растительном масле до золотистого цвета.\\nДобавьте воду и соль, доведите до кипения.\\nВыложите гречку, уменьшите огонь и варите под крышкой 15-20 минут до готовности.\\nПодавайте горячим.",\n  "proteins": 25,\n  "fats": 5,\n  "carbs": 45,\n  "cookingTime": 30,\n  "calories": 350,\n  "portionSize": 300\n}',
+      //         refusal: null,
+      //       },
+      //       logprobs: null,
+      //       finish_reason: "stop",
+      //     },
+      //   ],
+      // };
 
-      // Проверка на асинхронный статус (processing)
-      if (data.status === "processing" || data.status === "pending") {
-        this.logger.error("API returned processing status - async request not supported", {
-          status: data.status,
-          requestId: data.request_id,
-          fullResponse: JSON.stringify(data, null, 2),
-        });
+      // const data = {
+      //   "request_id": 27138127,
+      //   "model": "gpt-4-1",
+      //   "cost": 0.0029,
+      //   "response": [
+      //     {
+      //       "index": 0,
+      //       "message": {
+      //         "role": "assistant",
+      //         "content": "[\n  {\n    \"meals\": [\n      {\"type\": \"breakfast\", \"recipeName\": \"Яичница с помидорами\", \"calories\": 350, \"portionSize\": 200},\n      {\"type\": \"lunch\", \"recipeName\": \"Гречка с курицей\", \"calories\": 600, \"portionSize\": 250},\n      {\"type\": \"dinner\", \"recipeName\": \"Запеченные овощи\", \"calories\": 400, \"portionSize\": 200}\n    ]\n  }\n]",
+      //         "refusal": null
+      //       },
+      //       "logprobs": null,
+      //       "finish_reason": "stop"
+      //     }
+      //   ]
+      // }
 
-        throw new HttpException(
-          `API вернул статус "processing" - запрос обрабатывается асинхронно. Request ID: ${data.request_id || "неизвестен"}. Убедитесь, что параметр is_sync: true установлен.`,
-          HttpStatus.SERVICE_UNAVAILABLE,
-        );
-      }
+      this.logger.log("Response from model", data);
+      const finishReason = data.response[0]?.finish_reason;
+      this.logger.log("Finish reason:", finishReason);
+      const content = data.response[0]?.message?.content || "";
 
-      // Проверяем различные варианты структуры ответа
-      let content = "";
-      let finishReason = "";
+      this.logger.log("Content from model", content);
 
-      // Вариант 1: data.response[0] - массив строк или объектов
-      if (data.response && Array.isArray(data.response) && data.response[0]) {
-        const firstItem = data.response[0];
-        // Если элемент массива - строка
-        if (typeof firstItem === "string") {
-          content = firstItem;
-          this.logger.log("Parsed from response array (string format):", { contentLength: content.length });
-        }
-        // Если элемент массива - объект (Gemini формат)
-        else if (typeof firstItem === "object") {
-          finishReason = firstItem?.finish_reason || "";
-          content = firstItem?.message?.content || firstItem?.content || "";
-          this.logger.log("Parsed from response array (object format):", { finishReason, contentLength: content.length });
-        }
-      }
-      // Вариант 2: data.choices[0]?.message?.content (OpenAI формат)
-      else if (data.choices && Array.isArray(data.choices) && data.choices[0]) {
-        finishReason = data.choices[0]?.finish_reason || "";
-        content = data.choices[0]?.message?.content || "";
-        this.logger.log("Parsed from choices array:", { finishReason, contentLength: content.length });
-      }
-      // Вариант 3: data.content или data.message (прямой формат)
-      else if (data.content) {
-        content = data.content;
-        this.logger.log("Parsed from direct content:", { contentLength: content.length });
-      }
-      else if (data.message) {
-        content = typeof data.message === "string" ? data.message : data.message.content || "";
-        this.logger.log("Parsed from direct message:", { contentLength: content.length });
-      }
-      // Вариант 4: data.text
-      else if (data.text) {
-        content = data.text;
-        this.logger.log("Parsed from text field:", { contentLength: content.length });
-      }
-      else {
-        this.logger.error("Unknown response structure. Full data:", JSON.stringify(data, null, 2));
-        content = "";
-      }
-
-      this.logger.log("Final content:", { 
-        contentLength: content?.length || 0, 
-        isEmpty: !content?.trim(), 
-        isBrackets: content === "[]",
-        firstChars: content?.substring(0, 100) || "empty"
-      });
-
-      // Проверка на пустой контент
       if (!content?.trim() || content === "[]") {
-        this.logger.error("Empty or invalid response content", {
-          rawData: JSON.stringify(data, null, 2),
-          contentLength: content?.length || 0,
-          contentPreview: content?.substring(0, 200) || "empty",
-        });
-
         throw new HttpException(
-          `Пустой ответ от API. Структура ответа: ${JSON.stringify(data)}`,
+          "Empty response from API",
           HttpStatus.INTERNAL_SERVER_ERROR,
         );
       }
 
-      // Проверка на сообщения об ошибках от API
-      const errorMessages = [
-        "Произошла ошибка",
-        "ошибка",
-        "error",
-        "failed",
-        "недоступен",
-        "unavailable",
-      ];
-
-      const contentLower = content.toLowerCase();
-      const isErrorMessage = errorMessages.some(msg => contentLower.includes(msg.toLowerCase()));
-
-      if (isErrorMessage && content.length < 200) {
-        // Если это короткое сообщение об ошибке (менее 200 символов), скорее всего это ошибка API
-        this.logger.error("API returned error message", {
-          errorMessage: content,
-          rawData: JSON.stringify(data, null, 2),
-          requestId: data.request_id,
-          model: data.model,
-        });
-
-        throw new HttpException(
-          `API вернул ошибку: ${content}. Request ID: ${data.request_id || "неизвестен"}`,
-          HttpStatus.SERVICE_UNAVAILABLE,
-        );
-      }
-
       return content;
-
     } catch (error) {
-
-      const endpoint = this.getEndpoint();
-      const fullUrl = `${baseUrl}${endpoint}`;
-      
-      this.logger.error("Error fetching API response", {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: fullUrl,
-        model,
-        hasApiKey: !!apiKey,
-        endpoint,
-      });
-
+      this.logger.error("Error fetching API response", error);
       if (error.response?.status === 429) {
-
         throw new HttpException(
-
           "Лимит запросов к AI превышен",
-
           HttpStatus.TOO_MANY_REQUESTS,
-
         );
-
       }
-
       if (error.response?.status >= 500) {
-
         throw new HttpException(
-
           "Сервер временно недоступен",
-
           HttpStatus.SERVICE_UNAVAILABLE,
-
         );
-
       }
-
       if (error.response?.status === 401) {
-
         throw new HttpException(
-
           "Некорректный API ключ",
-
           HttpStatus.UNAUTHORIZED,
-
-        );
-
-      }
-
-      if (error.response?.status === 404) {
-        const suggestedEndpoints = [
-          "/networks/openai",
-          "/networks/gpt-4",
-          "/networks/gpt-4-turbo",
-          "/networks/gpt-5",
-          "/networks/gpt-5-mini",
-          "/networks/openai-gpt-4-turbo",
-          "/networks/openai-gpt-5-mini",
-        ];
-        
-        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting env variable.", {
-          currentEndpoint: endpoint,
-          currentModel: model,
-          fullUrl,
-          suggestedEndpoints,
-          envVarName: "GENAPI_GPT_ENDPOINT",
-        });
-
-        throw new HttpException(
-          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели ${model}. Попробуйте установить переменную окружения GENAPI_GPT_ENDPOINT или GENAPI_ENDPOINT. Возможные варианты: ${suggestedEndpoints.join(", ")}`,
-          HttpStatus.NOT_FOUND,
         );
       }
-
-      if (error.response?.status === 422) {
-        const errorData = error.response?.data;
-        
-        this.logger.error("422 Unprocessable Entity - Invalid request format", {
-          url: fullUrl,
-          model,
-          errorData: JSON.stringify(errorData, null, 2),
-          requestBody: JSON.stringify(requestBody, null, 2),
-          gptRequestFormat: process.env.GENAPI_GPT_REQUEST_FORMAT || 'with_model_with_sync',
-        });
-
-        throw new HttpException(
-          `Некорректный формат запроса к API. Проверьте название модели и структуру данных. Ответ API: ${JSON.stringify(errorData)}. Попробуйте установить переменную окружения GENAPI_GPT_REQUEST_FORMAT (with_model_with_sync, without_model_with_sync, with_model_without_sync, without_model_without_sync)`,
-          HttpStatus.UNPROCESSABLE_ENTITY,
-        );
-      }
-
       throw error
-
     }
-
   }
-
 }
