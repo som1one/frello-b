@@ -31,17 +31,26 @@ export class AiHttpClientService {
       );
     }
 
+    const requestBody = {
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      is_sync: true,
+    };
+
+    const fullUrl = `${baseUrl}/networks/gpt-5`;
+
+    this.logger.log(`Making request to: ${fullUrl}`, {
+      model,
+      endpoint: "/networks/gpt-5",
+      requestBody: JSON.stringify(requestBody, null, 2),
+    });
+
     try {
       const { data } = await firstValueFrom(
         this.httpService.post(
-          `${baseUrl}/networks/gpt-5`,
-          {
-            model,
-            messages,
-            temperature,
-            max_tokens: maxTokens,
-            is_sync: true,
-          },
+          fullUrl,
+          requestBody,
           {
             headers: { Authorization: `Bearer ${apiKey}` },
             timeout: 90000, // 90 секунд таймаут для безопасности
@@ -119,6 +128,19 @@ export class AiHttpClientService {
         throw new HttpException(
           "Некорректный API ключ",
           HttpStatus.UNAUTHORIZED,
+        );
+      }
+      if (error.response?.status === 422) {
+        const errorData = error.response?.data;
+        this.logger.error("422 Unprocessable Entity - Invalid request format", {
+          url: fullUrl,
+          model,
+          errorData: JSON.stringify(errorData, null, 2),
+          requestBody: JSON.stringify(requestBody, null, 2),
+        });
+        throw new HttpException(
+          `Некорректный формат запроса к API. Ответ API: ${JSON.stringify(errorData)}. Проверьте название модели и структуру данных.`,
+          HttpStatus.UNPROCESSABLE_ENTITY,
         );
       }
       throw error
