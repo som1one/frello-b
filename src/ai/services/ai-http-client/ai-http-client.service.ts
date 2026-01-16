@@ -7,7 +7,7 @@ import { MessageRole } from "../prepare/ai-prepare.service";
 export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
   private readonly apiConfig = {
-    model: "gpt-4.1-nano",
+    model: "gpt-5-mini",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
@@ -34,7 +34,7 @@ export class AiHttpClientService {
     try {
       const { data } = await firstValueFrom(
         this.httpService.post(
-          `${baseUrl}/networks/gpt-4-1`,
+          `${baseUrl}/networks/gpt-5-mini`,
           {
             model,
             messages,
