@@ -13,8 +13,8 @@ export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
 
   private readonly apiConfig = {
-    // Модель можно переопределить через GENAPI_MODEL (по умолчанию gpt-5-mini)
-    model: process.env.GENAPI_MODEL || "gpt-5-mini",
+    // Модель можно переопределить через GENAPI_MODEL (по умолчанию deepseek-chat)
+    model: process.env.GENAPI_MODEL || "deepseek-chat",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
