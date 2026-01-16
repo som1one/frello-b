@@ -7,7 +7,7 @@ import { MessageRole } from "../prepare/ai-prepare.service";
 export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
   private readonly apiConfig = {
-    model: "gpt-5",
+    model: "deepseek-chat",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
@@ -32,17 +32,18 @@ export class AiHttpClientService {
     }
 
     const requestBody = {
+      model,
       messages,
       temperature,
       max_tokens: maxTokens,
       is_sync: true,
     };
 
-    const fullUrl = `${baseUrl}/networks/gpt-5`;
+    const fullUrl = `${baseUrl}/networks/deepseek-chat`;
 
     this.logger.log(`Making request to: ${fullUrl}`, {
       model,
-      endpoint: "/networks/gpt-5",
+      endpoint: "/networks/deepseek-chat",
       requestBody: JSON.stringify(requestBody, null, 2),
     });
 
