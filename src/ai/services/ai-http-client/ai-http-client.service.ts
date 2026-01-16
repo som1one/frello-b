@@ -13,8 +13,8 @@ export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
 
   private readonly apiConfig = {
-    // Модель можно переопределить через GENAPI_MODEL (по умолчанию deepseek-chat)
-    model: process.env.GENAPI_MODEL || "deepseek-chat",
+    // Модель можно переопределить через GENAPI_MODEL (по умолчанию gpt-5-mini)
+    model: process.env.GENAPI_MODEL || "gpt-5-mini",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
@@ -28,11 +28,6 @@ export class AiHttpClientService {
     }
 
     const model = this.apiConfig.model.toLowerCase();
-    
-    // Определяем endpoint на основе модели
-    if (model.includes('deepseek')) {
-      return process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-chat";
-    }
     
     // Для GPT моделей пробуем специфичные endpoints
     if (model.includes('gpt-5-mini') || model.includes('gpt5mini')) {
@@ -75,10 +70,7 @@ export class AiHttpClientService {
       );
     }
 
-    // Определяем, является ли модель DeepSeek (для DeepSeek нужен is_sync, для GPT - возможно другой формат)
-    const isDeepSeek = model.toLowerCase().includes('deepseek');
-    
-    // Формируем тело запроса в зависимости от типа модели
+    // Формируем тело запроса для GPT моделей
     const requestBody: any = {
       messages,
       temperature,
@@ -96,42 +88,35 @@ export class AiHttpClientService {
         contentPreview: msg.content?.substring(0, 100) || "",
       }));
 
-      // Для DeepSeek добавляем model и is_sync
-      if (isDeepSeek) {
-        requestBody.model = model;
-        requestBody.is_sync = true;
-      } else {
-        // Для GPT моделей пробуем разные варианты в зависимости от переменной окружения
-        // По умолчанию используем формат с model и is_sync (как для DeepSeek)
-        const gptRequestFormat = process.env.GENAPI_GPT_REQUEST_FORMAT || 'with_model_with_sync';
-        
-        switch (gptRequestFormat) {
-          case 'with_model_with_sync':
-            // Вариант 1: с model и is_sync (как для DeepSeek) - ПО УМОЛЧАНИЮ
-            requestBody.model = model;
-            requestBody.is_sync = true;
-            break;
-          case 'without_model_with_sync':
-            // Вариант 2: без model, но с is_sync
-            requestBody.is_sync = true;
-            break;
-          case 'with_model_without_sync':
-            // Вариант 3: с model, но без is_sync
-            requestBody.model = model;
-            break;
-          case 'without_model_without_sync':
-            // Вариант 4: без model и без is_sync
-            break;
-          default:
-            // По умолчанию: с model и is_sync
-            requestBody.model = model;
-            requestBody.is_sync = true;
-        }
+      // Для GPT моделей пробуем разные варианты в зависимости от переменной окружения
+      // По умолчанию используем формат с model и is_sync
+      const gptRequestFormat = process.env.GENAPI_GPT_REQUEST_FORMAT || 'with_model_with_sync';
+      
+      switch (gptRequestFormat) {
+        case 'with_model_with_sync':
+          // Вариант 1: с model и is_sync - ПО УМОЛЧАНИЮ
+          requestBody.model = model;
+          requestBody.is_sync = true;
+          break;
+        case 'without_model_with_sync':
+          // Вариант 2: без model, но с is_sync
+          requestBody.is_sync = true;
+          break;
+        case 'with_model_without_sync':
+          // Вариант 3: с model, но без is_sync
+          requestBody.model = model;
+          break;
+        case 'without_model_without_sync':
+          // Вариант 4: без model и без is_sync
+          break;
+        default:
+          // По умолчанию: с model и is_sync
+          requestBody.model = model;
+          requestBody.is_sync = true;
       }
 
       this.logger.log(`Making request to: ${fullUrl}`, {
         model,
-        isDeepSeek,
         hasApiKey: !!apiKey,
         messagesCount: messages.length,
         messagesStructure: JSON.stringify(messagesStructure, null, 2),
@@ -172,10 +157,10 @@ export class AiHttpClientService {
       let content = "";
       let finishReason = "";
 
-      // Вариант 1: data.response[0] - массив строк (DeepSeek Chat формат)
+      // Вариант 1: data.response[0] - массив строк или объектов
       if (data.response && Array.isArray(data.response) && data.response[0]) {
         const firstItem = data.response[0];
-        // Если элемент массива - строка (DeepSeek Chat формат)
+        // Если элемент массива - строка
         if (typeof firstItem === "string") {
           content = firstItem;
           this.logger.log("Parsed from response array (string format):", { contentLength: content.length });
@@ -316,32 +301,26 @@ export class AiHttpClientService {
       }
 
       if (error.response?.status === 404) {
-        const isDeepSeek = model.toLowerCase().includes('deepseek');
-        const suggestedEndpoints = isDeepSeek 
-          ? ["/networks/deepseek-chat", "/networks/deepseek"]
-          : [
-              "/networks/openai",
-              "/networks/gpt-4",
-              "/networks/gpt-4-turbo",
-              "/networks/gpt-5",
-              "/networks/gpt-5-mini",
-              "/networks/openai-gpt-4-turbo",
-              "/networks/openai-gpt-5-mini",
-            ];
-        
-        const envVarName = isDeepSeek ? "GENAPI_DEEPSEEK_ENDPOINT" : "GENAPI_GPT_ENDPOINT";
+        const suggestedEndpoints = [
+          "/networks/openai",
+          "/networks/gpt-4",
+          "/networks/gpt-4-turbo",
+          "/networks/gpt-5",
+          "/networks/gpt-5-mini",
+          "/networks/openai-gpt-4-turbo",
+          "/networks/openai-gpt-5-mini",
+        ];
         
         this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting env variable.", {
           currentEndpoint: endpoint,
           currentModel: model,
           fullUrl,
-          isDeepSeek,
           suggestedEndpoints,
-          envVarName,
+          envVarName: "GENAPI_GPT_ENDPOINT",
         });
 
         throw new HttpException(
-          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели ${model}. Попробуйте установить переменную окружения ${envVarName} или GENAPI_ENDPOINT. Возможные варианты: ${suggestedEndpoints.join(", ")}`,
+          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели ${model}. Попробуйте установить переменную окружения GENAPI_GPT_ENDPOINT или GENAPI_ENDPOINT. Возможные варианты: ${suggestedEndpoints.join(", ")}`,
           HttpStatus.NOT_FOUND,
         );
       }
@@ -352,10 +331,9 @@ export class AiHttpClientService {
         this.logger.error("422 Unprocessable Entity - Invalid request format", {
           url: fullUrl,
           model,
-          isDeepSeek,
           errorData: JSON.stringify(errorData, null, 2),
           requestBody: JSON.stringify(requestBody, null, 2),
-          gptRequestFormat: process.env.GENAPI_GPT_REQUEST_FORMAT || 'with_model_without_sync',
+          gptRequestFormat: process.env.GENAPI_GPT_REQUEST_FORMAT || 'with_model_with_sync',
         });
 
         throw new HttpException(
