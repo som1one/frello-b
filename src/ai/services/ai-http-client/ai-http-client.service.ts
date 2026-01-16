@@ -13,14 +13,48 @@ export class AiHttpClientService {
   private readonly logger = new Logger(AiHttpClientService.name);
 
   private readonly apiConfig = {
-    model: "deepseek-chat",
+    // Модель можно переопределить через GENAPI_MODEL (по умолчанию gpt-5-mini)
+    model: process.env.GENAPI_MODEL || "gpt-5-mini",
     temperature: 0.5,
     maxTokens: 4096,
     apiKey: process.env.GENAPI_API_KEY || "",
     baseUrl: "https://api.gen-api.ru/api/v1",
-    // Endpoint для deepseek-chat (можно переопределить через GENAPI_DEEPSEEK_ENDPOINT)
-    endpoint: process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-chat",
   };
+
+  private getEndpoint(): string {
+    // Если указан явный endpoint через переменную окружения - используем его
+    if (process.env.GENAPI_ENDPOINT) {
+      return process.env.GENAPI_ENDPOINT;
+    }
+
+    const model = this.apiConfig.model.toLowerCase();
+    
+    // Определяем endpoint на основе модели
+    if (model.includes('deepseek')) {
+      return process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-chat";
+    }
+    
+    // Для GPT моделей пробуем разные варианты endpoints
+    if (model.includes('gpt-5-mini') || model.includes('gpt5mini')) {
+      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-5-mini";
+    }
+    if (model.includes('gpt-5') || model.includes('gpt5')) {
+      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-5";
+    }
+    if (model.includes('gpt-4-turbo') || model.includes('gpt4turbo')) {
+      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-4-turbo";
+    }
+    if (model.includes('gpt-4') || model.includes('gpt4')) {
+      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-4";
+    }
+    if (model.includes('gpt')) {
+      // Для любых других GPT моделей пробуем общий endpoint
+      return process.env.GENAPI_GPT_ENDPOINT || "/networks/openai";
+    }
+    
+    // По умолчанию для GPT моделей
+    return process.env.GENAPI_GPT_ENDPOINT || "/networks/openai";
+  }
 
   constructor(private readonly httpService: HttpService) { }
 
@@ -51,7 +85,7 @@ export class AiHttpClientService {
     };
 
     try {
-      const endpoint = this.apiConfig.endpoint;
+      const endpoint = this.getEndpoint();
       const fullUrl = `${baseUrl}${endpoint}`;
       
       // Логируем структуру сообщений (без полного контента для экономии места)
@@ -228,7 +262,7 @@ export class AiHttpClientService {
 
     } catch (error) {
 
-      const endpoint = this.apiConfig.endpoint;
+      const endpoint = this.getEndpoint();
       const fullUrl = `${baseUrl}${endpoint}`;
       
       this.logger.error("Error fetching API response", {
@@ -279,18 +313,32 @@ export class AiHttpClientService {
       }
 
       if (error.response?.status === 404) {
-        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting GENAPI_DEEPSEEK_ENDPOINT env variable.", {
+        const isDeepSeek = model.toLowerCase().includes('deepseek');
+        const suggestedEndpoints = isDeepSeek 
+          ? ["/networks/deepseek-chat", "/networks/deepseek"]
+          : [
+              "/networks/openai",
+              "/networks/gpt-4",
+              "/networks/gpt-4-turbo",
+              "/networks/gpt-5",
+              "/networks/gpt-5-mini",
+              "/networks/openai-gpt-4-turbo",
+              "/networks/openai-gpt-5-mini",
+            ];
+        
+        const envVarName = isDeepSeek ? "GENAPI_DEEPSEEK_ENDPOINT" : "GENAPI_GPT_ENDPOINT";
+        
+        this.logger.error("Endpoint not found. Possible issues: wrong endpoint path or model name. Try setting env variable.", {
           currentEndpoint: endpoint,
           currentModel: model,
           fullUrl,
-          suggestedEndpoints: [
-            "/networks/deepseek-chat",
-            "/networks/deepseek",
-          ],
+          isDeepSeek,
+          suggestedEndpoints,
+          envVarName,
         });
 
         throw new HttpException(
-          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели ${model}. Попробуйте установить переменную окружения GENAPI_DEEPSEEK_ENDPOINT. Возможные варианты: /networks/deepseek-chat, /networks/deepseek`,
+          `Эндпоинт не найден. Проверьте путь: ${fullUrl}. Возможно, нужно использовать другой endpoint для модели ${model}. Попробуйте установить переменную окружения ${envVarName} или GENAPI_ENDPOINT. Возможные варианты: ${suggestedEndpoints.join(", ")}`,
           HttpStatus.NOT_FOUND,
         );
       }
