@@ -311,12 +311,12 @@ export class AiPrepareService {
   "ingredients": [
     { "name": "string", "grams": number, "proteins": number, "fats": number, "carbs": number, "calories": number }
   ],
-  "instruction": "string",
+      "instruction": "string",
   "cookingTime": number,
   "portionSize": number,
-  "proteins": number,
-  "fats": number,
-  "carbs": number,
+        "proteins": number,
+          "fats": number,
+            "carbs": number,
   "calories": number
 }
 
@@ -335,7 +335,7 @@ export class AiPrepareService {
 - НЕЛЬЗЯ: написать ингредиенты так, чтобы по ним выходило 700+ ккал, а в calories указать 300–400. Всегда проверяй сумму.
 - ЕСЛИ нет чисел (calories/portionSize или у ингредиентов) — ответ считается НЕДЕЙСТВИТЕЛЬНЫМ, пересчитай и выдай корректные числа.
 
-${settingsStr}.
+  ${settingsStr}.
 ТОЛЬКО JSON, без markdown/пояснений/приветствий.`;
 
     const userContent =
