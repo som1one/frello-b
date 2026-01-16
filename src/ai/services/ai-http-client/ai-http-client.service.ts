@@ -34,21 +34,9 @@ export class AiHttpClientService {
       return process.env.GENAPI_DEEPSEEK_ENDPOINT || "/networks/deepseek-chat";
     }
     
-    // Для GPT моделей пробуем разные варианты endpoints
-    if (model.includes('gpt-5-mini') || model.includes('gpt5mini')) {
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-5-mini";
-    }
-    if (model.includes('gpt-5') || model.includes('gpt5')) {
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-5";
-    }
-    if (model.includes('gpt-4-turbo') || model.includes('gpt4turbo')) {
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-4-turbo";
-    }
-    if (model.includes('gpt-4') || model.includes('gpt4')) {
-      return process.env.GENAPI_GPT_ENDPOINT || "/networks/gpt-4";
-    }
+    // Для GPT моделей используем общий endpoint /networks/openai
+    // Конкретная модель указывается в теле запроса через параметр model
     if (model.includes('gpt')) {
-      // Для любых других GPT моделей пробуем общий endpoint
       return process.env.GENAPI_GPT_ENDPOINT || "/networks/openai";
     }
     
